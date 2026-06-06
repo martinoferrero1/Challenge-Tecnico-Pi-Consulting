@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, Sequence
 
 
@@ -13,22 +14,30 @@ class OpenAIEmbeddingModel:
         self.client = client
 
     async def embed_text(self, text: str) -> list[float]:
-        embeddings = await self.embed_batch([text])
-        return embeddings[0]
+        client = self._get_client()
+        if hasattr(client, "aembed_query"):
+            return list(await client.aembed_query(text))
+
+        return list(await asyncio.to_thread(client.embed_query, text))
 
     async def embed_batch(self, texts: Sequence[str]) -> list[list[float]]:
-        response = await self._get_client().embeddings.create(
-            model=self.model,
-            input=list(texts),
-        )
+        client = self._get_client()
+        text_list = list(texts)
 
-        data = sorted(response.data, key=lambda item: item.index)
-        return [list(item.embedding) for item in data]
+        if hasattr(client, "aembed_documents"):
+            embeddings = await client.aembed_documents(text_list)
+        else:
+            embeddings = await asyncio.to_thread(client.embed_documents, text_list)
+
+        return [list(embedding) for embedding in embeddings]
 
     def _get_client(self) -> Any:
         if self.client is None:
-            from openai import AsyncOpenAI
+            from langchain_openai import OpenAIEmbeddings
 
-            self.client = AsyncOpenAI(api_key=self.api_key)
+            self.client = OpenAIEmbeddings(
+                api_key=self.api_key,
+                model=self.model,
+            )
 
         return self.client

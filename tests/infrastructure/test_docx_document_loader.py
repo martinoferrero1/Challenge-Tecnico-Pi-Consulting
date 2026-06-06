@@ -1,17 +1,28 @@
 import asyncio
 from pathlib import Path
-from zipfile import ZipFile
+from types import SimpleNamespace
 
 import pytest
 
 from app.infrastructure.document_loaders.docx_document_loader import DocxDocumentLoader
 
 
+class FakeDocxLoader:
+    def __init__(self, source: str) -> None:
+        self.source = source
+
+    def load(self) -> list[SimpleNamespace]:
+        return [
+            SimpleNamespace(page_content="First paragraph."),
+            SimpleNamespace(page_content="Second paragraph."),
+        ]
+
+
 def test_docx_document_loader_extracts_paragraph_text(tmp_path: Path) -> None:
     docx_path = tmp_path / "sample.docx"
-    create_docx_fixture(docx_path, ["First paragraph.", "Second paragraph."])
+    docx_path.write_bytes(b"fake docx content")
 
-    document = asyncio.run(DocxDocumentLoader().load(str(docx_path)))
+    document = asyncio.run(DocxDocumentLoader(loader_cls=FakeDocxLoader).load(str(docx_path)))
 
     assert document.id == "sample"
     assert document.content == "First paragraph.\nSecond paragraph."
@@ -30,19 +41,3 @@ def test_docx_document_loader_rejects_unsupported_extension(tmp_path: Path) -> N
 def test_docx_document_loader_rejects_missing_file() -> None:
     with pytest.raises(FileNotFoundError):
         asyncio.run(DocxDocumentLoader().load("missing.docx"))
-
-
-def create_docx_fixture(path: Path, paragraphs: list[str]) -> None:
-    paragraph_xml = "".join(
-        f"<w:p><w:r><w:t>{paragraph}</w:t></w:r></w:p>"
-        for paragraph in paragraphs
-    )
-
-    document_xml = f"""
-    <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-        <w:body>{paragraph_xml}</w:body>
-    </w:document>
-    """.strip()
-
-    with ZipFile(path, "w") as docx_file:
-        docx_file.writestr("word/document.xml", document_xml)

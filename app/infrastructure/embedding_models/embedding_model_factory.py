@@ -29,7 +29,7 @@ def create_embedding_model(settings: EmbeddingModelSettings) -> EmbeddingModelPo
     if provider == "openai":
         return OpenAIEmbeddingModel(
             api_key=_required_key(settings.openai_api_key, "OPENAI_API_KEY"),
-            model=settings.openai_embedding_model, # le paso este parametro extra ya que cohere tiene distintos tipos de inputs para embeddings, pueden ser search_document o search_query
+            model=settings.openai_embedding_model,
         )
 
     if provider == "cohere":

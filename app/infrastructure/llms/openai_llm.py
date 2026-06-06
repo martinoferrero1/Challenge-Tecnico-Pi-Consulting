@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 
@@ -13,17 +14,34 @@ class OpenAILLM:
         self.client = client
 
     async def generate(self, prompt: str) -> str:
-        response = await self._get_client().responses.create(
-            model=self.model,
-            input=prompt,
-        )
+        client = self._get_client()
 
-        return str(response.output_text).strip()
+        if hasattr(client, "ainvoke"):
+            response = await client.ainvoke(prompt)
+        else:
+            response = await asyncio.to_thread(client.invoke, prompt)
+
+        return self._content_to_text(response.content).strip()
 
     def _get_client(self) -> Any:
         if self.client is None:
-            from openai import AsyncOpenAI
+            from langchain_openai import ChatOpenAI
 
-            self.client = AsyncOpenAI(api_key=self.api_key)
+            self.client = ChatOpenAI(
+                api_key=self.api_key,
+                model=self.model,
+                temperature=0,
+            )
 
         return self.client
+
+    def _content_to_text(self, content: Any) -> str:
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            return " ".join(
+                str(item.get("text", item)) if isinstance(item, dict) else str(item)
+                for item in content
+            )
+
+        return str(content)

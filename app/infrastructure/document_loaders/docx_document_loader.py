@@ -1,11 +1,14 @@
+import asyncio
 from pathlib import Path
-from xml.etree import ElementTree
-from zipfile import ZipFile
+from typing import Any
 
 from app.domain.entities.document import Document
 
 
 class DocxDocumentLoader:
+    def __init__(self, loader_cls: type[Any] | None = None) -> None:
+        self.loader_cls = loader_cls
+
     async def load(self, source: str) -> Document:
         path = Path(source)
 
@@ -14,7 +17,12 @@ class DocxDocumentLoader:
         if path.suffix.lower() != ".docx":
             raise ValueError("Only .docx documents are supported")
 
-        content = self._extract_text(path)
+        langchain_documents = await asyncio.to_thread(self._load_documents, path)
+        content = "\n".join(
+            str(document.page_content).strip()
+            for document in langchain_documents
+            if str(document.page_content).strip()
+        )
 
         return Document(
             id=path.stem,
@@ -25,21 +33,11 @@ class DocxDocumentLoader:
             },
         )
 
-    def _extract_text(self, path: Path) -> str:
-        with ZipFile(path) as docx_file:
-            document_xml = docx_file.read("word/document.xml")
+    def _load_documents(self, path: Path) -> list[Any]:
+        loader_cls = self.loader_cls or self._get_loader_cls()
+        return list(loader_cls(str(path)).load())
 
-        root = ElementTree.fromstring(document_xml)
-        namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
-        paragraphs: list[str] = []
+    def _get_loader_cls(self) -> type[Any]:
+        from langchain_community.document_loaders import Docx2txtLoader
 
-        for paragraph in root.findall(".//w:p", namespace):
-            text = "".join(
-                node.text or ""
-                for node in paragraph.findall(".//w:t", namespace)
-            ).strip()
-
-            if text:
-                paragraphs.append(text)
-
-        return "\n".join(paragraphs)
+        return Docx2txtLoader

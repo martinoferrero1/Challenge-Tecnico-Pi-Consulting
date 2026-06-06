@@ -14,18 +14,34 @@ class GeminiLLM:
         self.client = client
 
     async def generate(self, prompt: str) -> str:
-        response = await asyncio.to_thread(
-            self._get_client().models.generate_content,
-            model=self.model,
-            contents=prompt,
-        )
+        client = self._get_client()
 
-        return str(response.text).strip()
+        if hasattr(client, "ainvoke"):
+            response = await client.ainvoke(prompt)
+        else:
+            response = await asyncio.to_thread(client.invoke, prompt)
+
+        return self._content_to_text(response.content).strip()
 
     def _get_client(self) -> Any:
         if self.client is None:
-            from google import genai
+            from langchain_google_genai import ChatGoogleGenerativeAI
 
-            self.client = genai.Client(api_key=self.api_key)
+            self.client = ChatGoogleGenerativeAI(
+                google_api_key=self.api_key,
+                model=self.model,
+                temperature=0,
+            )
 
         return self.client
+
+    def _content_to_text(self, content: Any) -> str:
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            return " ".join(
+                str(item.get("text", item)) if isinstance(item, dict) else str(item)
+                for item in content
+            )
+
+        return str(content)

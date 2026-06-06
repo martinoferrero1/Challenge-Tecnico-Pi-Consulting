@@ -16,38 +16,40 @@ class CohereEmbeddingModel:
         self.client = client
 
     async def embed_text(self, text: str) -> list[float]:
+        client = self._get_client()
+
+        if hasattr(client, "aembed_query"):
+            return list(await client.aembed_query(text))
+        if hasattr(client, "embed_query"):
+            return list(await asyncio.to_thread(client.embed_query, text))
+
         embeddings = await self.embed_batch([text])
         return embeddings[0]
 
     async def embed_batch(self, texts: Sequence[str]) -> list[list[float]]:
-        response = await asyncio.to_thread(
-            self._get_client().embed,
-            inputs=[
-                {"content": [{"type": "text", "text": text}]}
-                for text in texts
-            ],
-            model=self.model,
-            input_type=self.input_type,
-            embedding_types=["float"],
-        )
+        client = self._get_client()
+        text_list = list(texts)
 
-        return self._extract_embeddings(response)
+        if hasattr(client, "aembed_documents"):
+            embeddings = await client.aembed_documents(text_list)
+        elif hasattr(client, "embed"):
+            embeddings = await asyncio.to_thread(
+                client.embed,
+                text_list,
+                input_type=self.input_type,
+            )
+        else:
+            embeddings = await asyncio.to_thread(client.embed_documents, text_list)
+
+        return [list(embedding) for embedding in embeddings]
 
     def _get_client(self) -> Any:
         if self.client is None:
-            import cohere
+            from langchain_cohere import CohereEmbeddings
 
-            self.client = cohere.ClientV2(api_key=self.api_key)
+            self.client = CohereEmbeddings(
+                cohere_api_key=self.api_key,
+                model=self.model,
+            )
 
         return self.client
-
-    def _extract_embeddings(self, response: Any) -> list[list[float]]:
-        embeddings = getattr(response, "embeddings", None)
-        values = getattr(embeddings, "float", None)
-
-        if values is None and isinstance(embeddings, dict):
-            values = embeddings.get("float")
-        if values is None:
-            raise ValueError("Cohere response does not contain float embeddings")
-
-        return [list(embedding) for embedding in values]

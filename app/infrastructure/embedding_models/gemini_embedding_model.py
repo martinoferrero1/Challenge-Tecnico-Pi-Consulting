@@ -14,26 +14,30 @@ class GeminiEmbeddingModel:
         self.client = client
 
     async def embed_text(self, text: str) -> list[float]:
-        embeddings = await self.embed_batch([text])
-        return embeddings[0]
+        client = self._get_client()
+        if hasattr(client, "aembed_query"):
+            return list(await client.aembed_query(text))
+
+        return list(await asyncio.to_thread(client.embed_query, text))
 
     async def embed_batch(self, texts: Sequence[str]) -> list[list[float]]:
-        response = await asyncio.to_thread(
-            self._get_client().models.embed_content,
-            model=self.model,
-            contents=list(texts),
-        )
+        client = self._get_client()
+        text_list = list(texts)
 
-        return [self._embedding_values(embedding) for embedding in response.embeddings]
+        if hasattr(client, "aembed_documents"):
+            embeddings = await client.aembed_documents(text_list)
+        else:
+            embeddings = await asyncio.to_thread(client.embed_documents, text_list)
+
+        return [list(embedding) for embedding in embeddings]
 
     def _get_client(self) -> Any:
         if self.client is None:
-            from google import genai
+            from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
-            self.client = genai.Client(api_key=self.api_key)
+            self.client = GoogleGenerativeAIEmbeddings(
+                google_api_key=self.api_key,
+                model=self.model,
+            )
 
         return self.client
-
-    def _embedding_values(self, embedding: Any) -> list[float]:
-        values = getattr(embedding, "values", embedding)
-        return list(values)

@@ -2,7 +2,6 @@ import asyncio
 
 import pytest
 
-from app.application.services.text_chunker import ChunkingConfig, TextChunker
 from app.application.use_cases.index_document import IndexDocumentUseCase
 from app.application.use_cases.ingest_document import IngestDocumentUseCase
 from app.domain.entities.document import Document
@@ -12,6 +11,15 @@ from app.domain.entities.document_chunk import DocumentChunk
 class FakeDocumentLoader:
     async def load(self, source: str) -> Document:
         return Document(id="doc", content="one two three four five six")
+
+
+class FakeDocumentChunker:
+    def chunk(self, document: Document) -> tuple[DocumentChunk, ...]:
+        return (
+            DocumentChunk(id="chunk-1", content="one two three"),
+            DocumentChunk(id="chunk-2", content="three four five"),
+            DocumentChunk(id="chunk-3", content="five six"),
+        )
 
 
 class FakeEmbeddingModel:
@@ -47,7 +55,7 @@ class FakeVectorStore:
 def test_index_document_embeds_and_stores_chunks() -> None:
     ingest_use_case = IngestDocumentUseCase(
         document_loader=FakeDocumentLoader(),
-        text_chunker=TextChunker(ChunkingConfig(max_words=3, overlap_words=1)),
+        document_chunker=FakeDocumentChunker(),
     )
     embedding_model = FakeEmbeddingModel()
     vector_store = FakeVectorStore()
@@ -72,7 +80,7 @@ def test_index_document_embeds_and_stores_chunks() -> None:
 def test_index_document_rejects_embedding_count_mismatch() -> None:
     ingest_use_case = IngestDocumentUseCase(
         document_loader=FakeDocumentLoader(),
-        text_chunker=TextChunker(ChunkingConfig(max_words=3, overlap_words=1)),
+        document_chunker=FakeDocumentChunker(),
     )
     use_case = IndexDocumentUseCase(
         ingest_document_use_case=ingest_use_case,

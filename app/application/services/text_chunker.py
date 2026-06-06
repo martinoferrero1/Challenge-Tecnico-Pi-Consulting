@@ -26,7 +26,7 @@ class TextChunker:
 
     def chunk(self, document: Document) -> tuple[DocumentChunk, ...]:
         words = self._split_words(document.content)
-        step = self.config.max_words - self.config.overlap_words
+        step = self.config.max_words - self.config.overlap_words # obtengo la cantidad de palabras para aavanzar al inicio del siguiente chunk
         chunks: list[DocumentChunk] = []
 
         for chunk_index, start in enumerate(range(0, len(words), step)):

@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.domain.entities.document import Document
-from app.infrastructure.text_splitters.text_chunker import (
+from app.infrastructure.text_splitter.text_chunker import (
     TextChunker,
     TextSplitterConfig,
 )

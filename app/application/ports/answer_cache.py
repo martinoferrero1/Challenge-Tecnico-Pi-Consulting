@@ -10,3 +10,6 @@ class AnswerCachePort(Protocol):
 
     async def set(self, key: AnswerCacheKey, answer: Answer) -> None:
         raise NotImplementedError
+
+    async def list_by_question(self, question: str) -> list[Answer]:
+        raise NotImplementedError

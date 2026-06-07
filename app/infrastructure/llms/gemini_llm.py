@@ -1,5 +1,12 @@
 import asyncio
-from typing import Any
+from typing import Any, TypeVar
+
+from pydantic import BaseModel
+
+from app.infrastructure.llms.structured_output import invoke_structured
+
+
+StructuredOutput = TypeVar("StructuredOutput", bound=BaseModel)
 
 
 class GeminiLLM:
@@ -22,6 +29,17 @@ class GeminiLLM:
             response = await asyncio.to_thread(client.invoke, prompt)
 
         return self._content_to_text(response.content).strip()
+
+    async def generate_structured(
+        self,
+        prompt: str,
+        output_schema: type[StructuredOutput],
+    ) -> StructuredOutput:
+        return await invoke_structured(
+            client=self._get_client(),
+            prompt=prompt,
+            output_schema=output_schema,
+        )
 
     def _get_client(self) -> Any:
         if self.client is None:

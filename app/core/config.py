@@ -19,6 +19,19 @@ class Settings(BaseSettings):
     text_chunk_size: int = Field(default=800, alias="TEXT_CHUNK_SIZE")
     text_chunk_overlap: int = Field(default=120, alias="TEXT_CHUNK_OVERLAP")
     rag_retrieval_limit: int = Field(default=4, alias="RAG_RETRIEVAL_LIMIT")
+    conversation_context_mode: str = Field(
+        default="disabled",
+        alias="CONVERSATION_CONTEXT_MODE",
+    )
+    answer_cache_mode: str = Field(
+        default="document_context",
+        alias="ANSWER_CACHE_MODE",
+    )
+    conversation_history_limit: int = Field(
+        default=10,
+        ge=0,
+        alias="CONVERSATION_HISTORY_LIMIT",
+    )
     language_confidence_threshold: float = Field(
         default=0.5,
         ge=0,

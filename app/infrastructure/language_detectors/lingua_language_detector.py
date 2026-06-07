@@ -20,6 +20,8 @@ class LinguaLanguageDetector:
 
         best_value = max(confidence_values, key=lambda value: value.value)
 
+        print(f"best detected language: {best_value.language} with confidence {best_value.value}")
+
         return DetectedLanguage(
             name=self._language_name(best_value.language),
             confidence=float(best_value.value),

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.domain.entities.document_chunk import DocumentChunk
-from app.infrastructure.vector_stores.chroma_vector_store import ChromaVectorStore
+from app.infrastructure.vector_store.chroma_vector_store import ChromaVectorStore
 
 
 class FakeCollection:

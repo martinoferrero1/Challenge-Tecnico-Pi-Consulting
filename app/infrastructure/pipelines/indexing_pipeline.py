@@ -6,11 +6,11 @@ from app.infrastructure.document_loaders.docx_document_loader import DocxDocumen
 from app.infrastructure.embedding_models.embedding_model_factory import (
     create_embedding_model,
 )
-from app.infrastructure.text_splitters.text_chunker import (
+from app.infrastructure.text_splitter.text_chunker import (
     TextChunker,
     TextSplitterConfig,
 )
-from app.infrastructure.vector_stores.chroma_vector_store import ChromaVectorStore
+from app.infrastructure.vector_store.chroma_vector_store import ChromaVectorStore
 
 
 class IndexDocumentSettings(Protocol):

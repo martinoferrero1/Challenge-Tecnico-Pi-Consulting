@@ -22,6 +22,7 @@ from app.infrastructure.vector_stores.chroma_vector_store import ChromaVectorSto
 class AnswerQuestionSettings(Protocol):
     rag_retrieval_limit: int
     language_confidence_threshold: float
+    answer_validation_retries: int
     llm_provider: str
     embedding_provider: str
     openai_api_key: str | None
@@ -53,6 +54,7 @@ def create_answer_question_use_case(
         config=AnswerQuestionConfig(
             retrieval_limit=settings.rag_retrieval_limit,
             language_confidence_threshold=settings.language_confidence_threshold,
+            answer_validation_retries=settings.answer_validation_retries,
         ),
     )
 

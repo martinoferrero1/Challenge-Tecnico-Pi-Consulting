@@ -49,13 +49,18 @@ class FakeVectorStore:
 
 
 class FakeLLM:
-    def __init__(self, response: str = "Zara es una empresa de moda.") -> None:
-        self.response = response
+    def __init__(
+        self,
+        response: str = "Zara es una empresa de moda 👗.",
+        responses: list[str] | None = None,
+    ) -> None:
+        self.responses = responses or [response]
         self.prompts: list[str] = []
 
     async def generate(self, prompt: str) -> str:
+        response_index = min(len(self.prompts), len(self.responses) - 1)
         self.prompts.append(prompt)
-        return self.response
+        return self.responses[response_index]
 
 
 class FakeAnswerCache:
@@ -70,13 +75,18 @@ class FakeAnswerCache:
 
 
 class FakeLanguageDetector:
-    def __init__(self, language: DetectedLanguage | None) -> None:
-        self.language = language
+    def __init__(
+        self,
+        language: DetectedLanguage | None = None,
+        languages: list[DetectedLanguage | None] | None = None,
+    ) -> None:
+        self.languages = languages or [language]
         self.texts: list[str] = []
 
     def detect(self, text: str) -> DetectedLanguage | None:
+        language_index = min(len(self.texts), len(self.languages) - 1)
         self.texts.append(text)
-        return self.language
+        return self.languages[language_index]
 
 
 def test_answer_question_generates_and_caches_answer() -> None:
@@ -109,19 +119,22 @@ def test_answer_question_generates_and_caches_answer() -> None:
         use_case.execute(UserQuestion(user_name="Luis", content=" Que es Zara? "))
     )
 
-    assert first_answer.content == "Zara es una empresa de moda."
-    assert cached_answer.content == "Zara es una empresa de moda."
+    assert first_answer.content == "Zara es una empresa de moda 👗."
+    assert cached_answer.content == "Zara es una empresa de moda 👗."
     assert cached_answer.question.user_name == "Luis"
     assert len(llm.prompts) == 1
     assert "Zara es una empresa internacional de moda." in llm.prompts[0]
     assert "You must answer in Spanish." in llm.prompts[0]
     assert "answer in another language" in llm.prompts[0]
+    assert "Answer in exactly one sentence." in llm.prompts[0]
+    assert "Include one or more relevant emojis" in llm.prompts[0]
+    assert "Answer in third person" in llm.prompts[0]
     assert vector_store.limits == [4, 4]
 
 
 def test_answer_question_returns_fallback_when_no_context_is_found() -> None:
     llm = FakeLLM(
-        response="There is not enough information in the document to answer."
+        response="The document does not provide enough information to answer ❓."
     )
     use_case = AnswerQuestionUseCase(
         embedding_model=FakeEmbeddingModel(),
@@ -137,10 +150,12 @@ def test_answer_question_returns_fallback_when_no_context_is_found() -> None:
         use_case.execute(UserQuestion(user_name="Ana", content="Pregunta sin datos"))
     )
 
-    assert answer.content == "There is not enough information in the document to answer."
+    assert answer.content == "The document does not provide enough information to answer ❓."
     assert answer.context == ()
     assert "Return only a fallback answer." in llm.prompts[0]
     assert "You must answer in English." in llm.prompts[0]
+    assert "exactly one sentence" in llm.prompts[0]
+    assert "relevant emojis" in llm.prompts[0]
 
 
 def test_answer_question_does_not_pin_language_when_confidence_is_low() -> None:
@@ -169,3 +184,45 @@ def test_answer_question_does_not_pin_language_when_confidence_is_low() -> None:
 
     assert "You must answer in Spanish." not in llm.prompts[0]
     assert "Do not use a default language." in llm.prompts[0]
+
+
+def test_answer_question_rewrites_once_with_all_failed_validation_rules() -> None:
+    retrieved_chunk = RetrievedChunk(
+        chunk=DocumentChunk(
+            id="chunk-1",
+            content="Zara es una empresa internacional de moda.",
+        ),
+        similarity_score=0.9,
+    )
+    llm = FakeLLM(
+        responses=[
+            "I think Zara is a fashion company. It is international.",
+            "Zara is an international fashion company 👗.",
+        ]
+    )
+    use_case = AnswerQuestionUseCase(
+        embedding_model=FakeEmbeddingModel(),
+        vector_store=FakeVectorStore([retrieved_chunk]),
+        llm=llm,
+        answer_cache=FakeAnswerCache(),
+        language_detector=FakeLanguageDetector(
+            languages=[
+                DetectedLanguage(name="English", confidence=0.99),
+                DetectedLanguage(name="Spanish", confidence=0.99),
+            ]
+        ),
+        config=AnswerQuestionConfig(answer_validation_retries=1),
+    )
+
+    answer = asyncio.run(
+        use_case.execute(UserQuestion(user_name="Ana", content="What is Zara?"))
+    )
+
+    assert answer.content == "Zara is an international fashion company 👗."
+    assert len(llm.prompts) == 2
+    assert "heuristic assumptions" in llm.prompts[1]
+    assert "The answer may not be exactly one sentence." in llm.prompts[1]
+    assert "does not include emoji" in llm.prompts[1]
+    assert "may not be written in third person" in llm.prompts[1]
+    assert "may not be in English" in llm.prompts[1]
+    assert "Previous answer:" in llm.prompts[1]

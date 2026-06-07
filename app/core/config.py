@@ -25,6 +25,12 @@ class Settings(BaseSettings):
         le=1,
         alias="LANGUAGE_CONFIDENCE_THRESHOLD",
     )
+    answer_validation_retries: int = Field(
+        default=1,
+        ge=0,
+        le=1,
+        alias="ANSWER_VALIDATION_RETRIES",
+    )
     llm_provider: str = Field(default="openai", alias="LLM_PROVIDER")
     embedding_provider: str = Field(default="openai", alias="EMBEDDING_PROVIDER")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")

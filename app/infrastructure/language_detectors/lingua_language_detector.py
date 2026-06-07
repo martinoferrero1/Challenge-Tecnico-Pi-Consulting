@@ -14,7 +14,7 @@ class LinguaLanguageDetector:
         confidence_values = self._get_detector().compute_language_confidence_values(
             text
         )
-        print(f"detected languages and confidences: {confidence_values}")
+        #print(f"detected languages and confidences: {confidence_values}")
         if not confidence_values:
             return None
 

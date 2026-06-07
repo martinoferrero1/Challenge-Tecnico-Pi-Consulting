@@ -8,8 +8,12 @@ class Settings(BaseSettings):
     app_version: str = Field(default="0.1.0", alias="APP_VERSION")
     api_prefix: str = Field(default="/api", alias="API_PREFIX")
     source_document_path: str = Field(
-        default="data/documento.docx",
+        default="data/original_document.docx",
         alias="SOURCE_DOCUMENT_PATH",
+    )
+    source_document_is_default: bool = Field(
+        default=True,
+        alias="SOURCE_DOCUMENT_IS_DEFAULT",
     )
     chroma_persist_dir: str = Field(default=".chroma", alias="CHROMA_PERSIST_DIR")
     chroma_collection_name: str = Field(

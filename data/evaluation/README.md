@@ -1,7 +1,7 @@
 # API run datasets
 
 These JSONL datasets run ordered question sequences against the API using
-content from `data/documento.docx`. They do not grade answer quality; they
+content from `data/original_document.docx`. They do not grade answer quality; they
 only print and save API responses so you can inspect them manually.
 
 ## Recommended mode/dataset pairs

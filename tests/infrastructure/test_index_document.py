@@ -1,5 +1,10 @@
 from types import SimpleNamespace
 
+from app.infrastructure.text_splitter.text_chunker import (
+    DEFAULT_DOCUMENT_SECTION_CHUNK_OVERLAP,
+    DEFAULT_DOCUMENT_SECTION_CHUNK_SIZE,
+    DEFAULT_DOCUMENT_SECTIONS_CHUNKING_STRATEGY,
+)
 from app.infrastructure.pipelines import indexing_pipeline
 
 
@@ -43,7 +48,11 @@ def test_index_document_with_indexing_dependencies(monkeypatch) -> None:
     )
 
     use_case = indexing_pipeline.create_index_document_use_case(
-        build_settings(text_chunk_size=500, text_chunk_overlap=75)
+        build_settings(
+            source_document_is_default=False,
+            text_chunk_size=500,
+            text_chunk_overlap=75,
+        )
     )
 
     ingest_use_case = use_case.ingest_document_use_case
@@ -54,8 +63,41 @@ def test_index_document_with_indexing_dependencies(monkeypatch) -> None:
     assert use_case.vector_store is vector_store
 
 
+def test_index_document_uses_default_document_chunking_strategy(monkeypatch) -> None:
+    document_loader = FakeDocumentLoader()
+    embedding_model = FakeEmbeddingModel()
+    vector_store = FakeVectorStore()
+
+    monkeypatch.setattr(
+        indexing_pipeline,
+        "DocxDocumentLoader",
+        lambda: document_loader,
+    )
+    monkeypatch.setattr(indexing_pipeline, "TextChunker", FakeTextChunker)
+    monkeypatch.setattr(
+        indexing_pipeline,
+        "create_embedding_model",
+        lambda settings: embedding_model,
+    )
+    monkeypatch.setattr(
+        indexing_pipeline,
+        "ChromaVectorStore",
+        lambda persist_dir, collection_name: vector_store,
+    )
+
+    use_case = indexing_pipeline.create_index_document_use_case(
+        build_settings(source_document_is_default=True)
+    )
+
+    config = use_case.ingest_document_use_case.document_chunker.config
+    assert config.strategy == DEFAULT_DOCUMENT_SECTIONS_CHUNKING_STRATEGY
+    assert config.chunk_size == DEFAULT_DOCUMENT_SECTION_CHUNK_SIZE
+    assert config.chunk_overlap == DEFAULT_DOCUMENT_SECTION_CHUNK_OVERLAP
+
+
 def build_settings(**overrides: object) -> SimpleNamespace:
     defaults = {
+        "source_document_is_default": False,
         "text_chunk_size": 800,
         "text_chunk_overlap": 120,
         "embedding_provider": "openai",

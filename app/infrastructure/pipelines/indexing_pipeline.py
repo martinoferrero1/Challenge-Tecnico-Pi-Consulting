@@ -7,6 +7,9 @@ from app.infrastructure.embedding_models.embedding_model_factory import (
     create_embedding_model,
 )
 from app.infrastructure.text_splitter.text_chunker import (
+    DEFAULT_DOCUMENT_SECTION_CHUNK_OVERLAP,
+    DEFAULT_DOCUMENT_SECTION_CHUNK_SIZE,
+    DEFAULT_DOCUMENT_SECTIONS_CHUNKING_STRATEGY,
     TextChunker,
     TextSplitterConfig,
 )
@@ -14,6 +17,7 @@ from app.infrastructure.vector_store.chroma_vector_store import ChromaVectorStor
 
 
 class IndexDocumentSettings(Protocol):
+    source_document_is_default: bool
     text_chunk_size: int
     text_chunk_overlap: int
     embedding_provider: str
@@ -32,12 +36,7 @@ def create_index_document_use_case(
     settings: IndexDocumentSettings,
 ) -> IndexDocumentUseCase:
     document_loader = DocxDocumentLoader()
-    document_chunker = TextChunker(
-        config=TextSplitterConfig(
-            chunk_size=settings.text_chunk_size,
-            chunk_overlap=settings.text_chunk_overlap,
-        )
-    )
+    document_chunker = _create_document_chunker(settings)
     ingest_document_use_case = IngestDocumentUseCase(
         document_loader=document_loader,
         document_chunker=document_chunker,
@@ -50,4 +49,22 @@ def create_index_document_use_case(
             persist_dir=settings.chroma_persist_dir,
             collection_name=settings.chroma_collection_name,
         ),
+    )
+
+
+def _create_document_chunker(settings: IndexDocumentSettings) -> TextChunker:
+    if settings.source_document_is_default:
+        return TextChunker(
+            config=TextSplitterConfig(
+                chunk_size=DEFAULT_DOCUMENT_SECTION_CHUNK_SIZE,
+                chunk_overlap=DEFAULT_DOCUMENT_SECTION_CHUNK_OVERLAP,
+                strategy=DEFAULT_DOCUMENT_SECTIONS_CHUNKING_STRATEGY,
+            )
+        )
+
+    return TextChunker(
+        config=TextSplitterConfig(
+            chunk_size=settings.text_chunk_size,
+            chunk_overlap=settings.text_chunk_overlap,
+        )
     )

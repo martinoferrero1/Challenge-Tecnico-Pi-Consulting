@@ -32,9 +32,9 @@ def test_ingest_document_loads_and_chunks_document() -> None:
     )
     use_case = IngestDocumentUseCase(loader, FakeDocumentChunker())
 
-    result = asyncio.run(use_case.execute("documento.docx"))
+    result = asyncio.run(use_case.execute("original_document.docx"))
 
-    assert loader.source == "documento.docx"
+    assert loader.source == "original_document.docx"
     assert result.document.id == "doc"
     assert [chunk.content for chunk in result.chunks] == [
         "one two three",

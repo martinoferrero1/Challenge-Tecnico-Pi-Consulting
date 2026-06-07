@@ -65,7 +65,7 @@ def test_index_document_embeds_and_stores_chunks() -> None:
         vector_store=vector_store,
     )
 
-    result = asyncio.run(use_case.execute("documento.docx"))
+    result = asyncio.run(use_case.execute("original_document.docx"))
 
     assert embedding_model.texts == [
         "one two three",
@@ -89,4 +89,4 @@ def test_index_document_rejects_embedding_count_mismatch() -> None:
     )
 
     with pytest.raises(ValueError):
-        asyncio.run(use_case.execute("documento.docx"))
+        asyncio.run(use_case.execute("original_document.docx"))

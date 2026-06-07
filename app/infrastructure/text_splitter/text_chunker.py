@@ -1,17 +1,32 @@
 from dataclasses import dataclass
 from hashlib import sha256
+import re
 from typing import Any
 
 from app.domain.entities.document import Document
 from app.domain.entities.document_chunk import DocumentChunk
 
 
+RECURSIVE_CHUNKING_STRATEGY = "recursive"
+DEFAULT_DOCUMENT_SECTIONS_CHUNKING_STRATEGY = "default_document_sections"
+DEFAULT_DOCUMENT_SECTION_CHUNK_SIZE = 2000
+DEFAULT_DOCUMENT_SECTION_CHUNK_OVERLAP = 0
+_SUPPORTED_CHUNKING_STRATEGIES = {
+    RECURSIVE_CHUNKING_STRATEGY,
+    DEFAULT_DOCUMENT_SECTIONS_CHUNKING_STRATEGY,
+}
+_SECTION_TITLE_PATTERN = re.compile(r"^(?P<title>[^:\n]{1,120}):\s+")
+
+
 @dataclass(frozen=True)
 class TextSplitterConfig:
     chunk_size: int = 800
     chunk_overlap: int = 120
+    strategy: str = RECURSIVE_CHUNKING_STRATEGY
 
     def __post_init__(self) -> None:
+        if self.strategy not in _SUPPORTED_CHUNKING_STRATEGIES:
+            raise ValueError(f"Unsupported chunking strategy: {self.strategy}")
         if self.chunk_size <= 0:
             raise ValueError("The chunk size must be greater than zero")
         if self.chunk_overlap < 0:
@@ -30,6 +45,12 @@ class TextChunker:
         self.splitter = splitter or self._build_splitter()
 
     def chunk(self, document: Document) -> tuple[DocumentChunk, ...]:
+        if self.config.strategy == DEFAULT_DOCUMENT_SECTIONS_CHUNKING_STRATEGY:
+            return self._chunk_default_document_sections(document)
+
+        return self._chunk_with_splitter(document)
+
+    def _chunk_with_splitter(self, document: Document) -> tuple[DocumentChunk, ...]:
         source_document = self._to_source_document(document)
         split_documents = self.splitter.split_documents([source_document])
         chunks: list[DocumentChunk] = []
@@ -57,6 +78,62 @@ class TextChunker:
             )
 
         return tuple(chunks)
+
+    def _chunk_default_document_sections(
+        self,
+        document: Document,
+    ) -> tuple[DocumentChunk, ...]:
+        sections = self._split_default_document_sections(document.content)
+        if not sections:
+            return self._chunk_with_splitter(document)
+
+        chunks: list[DocumentChunk] = []
+
+        for section_index, section in enumerate(sections):
+            content = section["content"]
+            metadata = {
+                **document.metadata,
+                "document_id": document.id,
+                "chunk_index": str(section_index),
+                "chunk_strategy": self.config.strategy,
+                "section_index": str(section_index),
+            }
+            if section["title"]:
+                metadata["section_title"] = section["title"]
+
+            chunks.append(
+                DocumentChunk(
+                    id=self._build_chunk_id(document.id, section_index, content),
+                    content=content,
+                    metadata=self._string_metadata(metadata),
+                )
+            )
+
+        return tuple(chunks)
+
+    def _split_default_document_sections(
+        self,
+        content: str,
+    ) -> tuple[dict[str, str], ...]:
+        paragraphs = [
+            paragraph.strip()
+            for paragraph in re.split(r"\n\s*\n+", content.strip())
+            if paragraph.strip()
+        ]
+
+        sections: list[dict[str, str]] = []
+        for paragraph in paragraphs:
+            title_match = _SECTION_TITLE_PATTERN.match(paragraph)
+            sections.append(
+                {
+                    "content": paragraph,
+                    "title": title_match.group("title").strip()
+                    if title_match
+                    else "",
+                }
+            )
+
+        return tuple(sections)
 
     def _build_splitter(self) -> Any:
         from langchain_text_splitters import RecursiveCharacterTextSplitter

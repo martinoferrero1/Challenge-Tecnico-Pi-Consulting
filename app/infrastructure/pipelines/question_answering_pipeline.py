@@ -12,12 +12,16 @@ from app.infrastructure.answer_caches.in_memory_answer_cache import (
 from app.infrastructure.embedding_models.embedding_model_factory import (
     create_embedding_model,
 )
+from app.infrastructure.language_detectors.lingua_language_detector import (
+    LinguaLanguageDetector,
+)
 from app.infrastructure.llms.llm_factory import create_llm
 from app.infrastructure.vector_stores.chroma_vector_store import ChromaVectorStore
 
 
 class AnswerQuestionSettings(Protocol):
     rag_retrieval_limit: int
+    language_confidence_threshold: float
     llm_provider: str
     embedding_provider: str
     openai_api_key: str | None
@@ -45,8 +49,10 @@ def create_answer_question_use_case(
         ),
         llm=create_llm(settings),
         answer_cache=get_answer_cache(),
+        language_detector=LinguaLanguageDetector(),
         config=AnswerQuestionConfig(
             retrieval_limit=settings.rag_retrieval_limit,
+            language_confidence_threshold=settings.language_confidence_threshold,
         ),
     )
 

@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     text_chunk_size: int = Field(default=800, alias="TEXT_CHUNK_SIZE")
     text_chunk_overlap: int = Field(default=120, alias="TEXT_CHUNK_OVERLAP")
     rag_retrieval_limit: int = Field(default=4, alias="RAG_RETRIEVAL_LIMIT")
+    language_confidence_threshold: float = Field(
+        default=0.5,
+        ge=0,
+        le=1,
+        alias="LANGUAGE_CONFIDENCE_THRESHOLD",
+    )
     llm_provider: str = Field(default="openai", alias="LLM_PROVIDER")
     embedding_provider: str = Field(default="openai", alias="EMBEDDING_PROVIDER")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")

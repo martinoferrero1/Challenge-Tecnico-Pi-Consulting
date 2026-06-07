@@ -34,10 +34,11 @@ class DocxDocumentLoader:
         )
 
     def _load_documents(self, path: Path) -> list[Any]:
-        loader_cls = self.loader_cls or self._get_loader_cls()
+        if self.loader_cls:
+            loader_cls = self.loader_cls
+        else:
+            from langchain_community.document_loaders import Docx2txtLoader
+
+            loader_cls = Docx2txtLoader
+
         return list(loader_cls(str(path)).load())
-
-    def _get_loader_cls(self) -> type[Any]:
-        from langchain_community.document_loaders import Docx2txtLoader
-
-        return Docx2txtLoader

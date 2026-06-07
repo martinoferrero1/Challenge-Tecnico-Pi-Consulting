@@ -2,8 +2,19 @@ services:
   api:
     build:
       context: .
+    env_file:
+      - .env
+    environment:
+      CHROMA_PERSIST_DIR: ${CHROMA_PERSIST_DIR:-/app/.chroma}
     ports:
       - "8000:8000"
     volumes:
       - ./app:/app/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      - ./data:/app/data:ro
+      - chroma_data:/app/.chroma
+    command: >
+      sh -c "python -m app.scripts.index_document &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+volumes:
+  chroma_data:

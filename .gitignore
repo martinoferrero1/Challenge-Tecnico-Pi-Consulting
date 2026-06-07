@@ -209,6 +209,9 @@ tempCodeRunnerFile.py
 # PyPI configuration file
 .pypirc
 
+# Local vector database
+.chroma/
+
 # Marimo
 marimo/_static/
 marimo/_lsp/

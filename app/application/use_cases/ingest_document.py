@@ -22,6 +22,7 @@ class IngestDocumentUseCase:
         self.document_chunker = document_chunker
 
     async def execute(self, source: str) -> IngestedDocument:
+        print(f"Loading document from source: {source}")
         if not source.strip():
             raise ValueError("Document source cannot be empty")
 

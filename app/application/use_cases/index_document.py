@@ -30,7 +30,7 @@ class IndexDocumentUseCase:
         chunk_contents = [chunk.content for chunk in ingested_document.chunks]
         embeddings = await self.embedding_model.embed_batch(chunk_contents)
 
-        if len(embeddings) != len(ingested_document.chunks): # a priori deberia cumplir siempre, pero hago la validacion por seguridad
+        if len(embeddings) != len(ingested_document.chunks):
             raise ValueError("The number of embeddings must match the number of chunks")
 
         await self.vector_store.add_chunks(ingested_document.chunks, embeddings)

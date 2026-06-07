@@ -1,0 +1,47 @@
+from fastapi.testclient import TestClient
+
+from app.api.dependencies import get_answer_question_use_case
+from app.domain.entities.answer import Answer
+from app.domain.entities.question import UserQuestion
+from app.main import app
+
+
+class FakeAnswerQuestionUseCase:
+    def __init__(self) -> None:
+        self.questions: list[UserQuestion] = []
+
+    async def execute(self, question: UserQuestion) -> Answer:
+        self.questions.append(question)
+        return Answer(
+            question=question,
+            content="Zara es una empresa de moda.",
+            context=(),
+        )
+
+
+def test_answer_question_endpoint_uses_injected_use_case() -> None:
+    use_case = FakeAnswerQuestionUseCase()
+    previous_overrides = dict(app.dependency_overrides)
+    app.dependency_overrides[get_answer_question_use_case] = lambda: use_case
+
+    try:
+        response = TestClient(app).post(
+            "/api/questions",
+            json={
+                "user_name": " Ana ",
+                "question": " Que es Zara? ",
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(previous_overrides)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "user_name": "Ana",
+        "question": "Que es Zara?",
+        "answer": "Zara es una empresa de moda.",
+    }
+    assert use_case.questions == [
+        UserQuestion(user_name="Ana", content="Que es Zara?"),
+    ]

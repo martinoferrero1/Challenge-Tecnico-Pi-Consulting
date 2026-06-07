@@ -1,10 +1,11 @@
 import re
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import Literal
+from typing import Awaitable, Callable, Literal, TypeVar
 
 from pydantic import BaseModel
 
+from app.application.errors import ExternalServiceError
 from app.application.ports.answer_cache import AnswerCachePort
 from app.application.ports.conversation_store import ConversationStorePort
 from app.application.ports.embedding_model import EmbeddingModelPort
@@ -27,6 +28,7 @@ SUPPORTED_RESPONSE_LANGUAGES = {
 CONVERSATION_CONTEXT_MODES = {"disabled", "prompt", "rewrite"}
 ANSWER_CACHE_MODES = {"document_context", "question", "context_aware"}
 EMOJI_PATTERN = re.compile(r"[\U0001F300-\U0001FAFF\u2600-\u27BF]")
+ServiceResult = TypeVar("ServiceResult")
 FIRST_OR_SECOND_PERSON_PATTERN = re.compile(
     r"\b("
     r"i|me|my|mine|we|us|our|ours|you|your|yours|"
@@ -120,7 +122,7 @@ class AnswerQuestionUseCase:
     async def execute(self, question: UserQuestion) -> Answer:
         question = await self._build_question_with_stored_conversation(question)
         question = self._build_effective_question(question) # retorno un objeto UserQuestion conteniendo el historial necesario, dependiendo del CONVERSATION_CONTEXT_MODE, del CONVERSATION_HISTORY_LIMIT, y logicamente de la cantidad de mensajes hasta el momento
-        detected_language = self.language_detector.detect(question.content) # detecto el lenguaje de la pregunta del usuario
+        detected_language = self._detect_language(question.content) # detecto el lenguaje de la pregunta del usuario
         retrieval_question: str | None = None
 
         if self._answer_cache_mode() == "question": # en este caso, el rag está configurado para buscar en la cache solo por el contenido exacto de la pregunta, sin importar el contexto (poco flexible si se hace la pregunta con iguales palabras pero haciendo referencia a cosas distintas), pero más rápido y barato
@@ -129,7 +131,9 @@ class AnswerQuestionUseCase:
                 retrieved_chunks=(),
                 retrieval_question=question.content,
             )
-            cached_answer = await self.answer_cache.get(cache_key)
+            cached_answer = await self._run_controlled(
+                lambda: self.answer_cache.get(cache_key),
+            )
             if cached_answer is not None:
                 print("returning cached answer!! (simple question only mode)")
                 return await self._remember_and_return(
@@ -137,8 +141,10 @@ class AnswerQuestionUseCase:
                 )
 
         if self._answer_cache_mode() == "context_aware": # en este caso, el rag está configurado para buscar contenido cacheado por misma pregunta, pero utilizo un LLM para comparar ambas preguntas teniendo el cuenta el contexto y decidir si referencia a lo mismo
-            cache_candidates = await self.answer_cache.list_by_question(
-                question.normalized_content
+            cache_candidates = await self._run_controlled(
+                lambda: self.answer_cache.list_by_question(
+                    question.normalized_content
+                ),
             )
             if cache_candidates:
                 retrieval_question = await self._build_retrieval_question(
@@ -163,11 +169,15 @@ class AnswerQuestionUseCase:
                 detected_language=detected_language,
             )
 
-        query_embedding = await self.embedding_model.embed_text(retrieval_question)
+        query_embedding = await self._run_controlled(
+            lambda: self.embedding_model.embed_text(retrieval_question),
+        )
         retrieved_chunks = tuple(
-            await self.vector_store.search(
-                query_embedding=query_embedding,
-                limit=self.config.retrieval_limit,
+            await self._run_controlled(
+                lambda: self.vector_store.search(
+                    query_embedding=query_embedding,
+                    limit=self.config.retrieval_limit,
+                ),
             )
         )
 
@@ -181,7 +191,9 @@ class AnswerQuestionUseCase:
         )
 
         if self._answer_cache_mode() == "document_context": # si el modo llega a ser document_context, entonces se va a comparar tanto por la pregunta como por los chunks recuperados
-            cached_answer = await self.answer_cache.get(cache_key)
+            cached_answer = await self._run_controlled(
+                lambda: self.answer_cache.get(cache_key),
+            )
             if cached_answer is not None:
                 print("returning cached answer (document context mode)")
                 return await self._remember_and_return(
@@ -207,7 +219,9 @@ class AnswerQuestionUseCase:
                     retrieval_question=retrieval_question,
                 ),
             )
-            await self.answer_cache.set(cache_key, answer)
+            await self._run_controlled(
+                lambda: self.answer_cache.set(cache_key, answer),
+            )
             return await self._remember_and_return(answer)
 
         prompt = self._build_prompt(
@@ -229,7 +243,9 @@ class AnswerQuestionUseCase:
                 retrieval_question=retrieval_question,
             ),
         )
-        await self.answer_cache.set(cache_key, answer)
+        await self._run_controlled(
+            lambda: self.answer_cache.set(cache_key, answer),
+        )
 
         return await self._remember_and_return(answer)
 
@@ -238,7 +254,11 @@ class AnswerQuestionUseCase:
         prompt: str,
         detected_language: DetectedLanguage | None,
     ) -> str:
-        answer = (await self.llm.generate(prompt)).strip()
+        answer = (
+            await self._run_controlled(
+                lambda: self.llm.generate(prompt),
+            )
+        ).strip()
         validation = self._validate_answer(answer, detected_language)
 
         if validation.is_valid or self.config.answer_validation_retries == 0:
@@ -251,7 +271,11 @@ class AnswerQuestionUseCase:
             detected_language=detected_language,
         )
 
-        return (await self.llm.generate(retry_prompt)).strip()
+        return (
+            await self._run_controlled(
+                lambda: self.llm.generate(retry_prompt),
+            )
+        ).strip()
 
     async def _build_retrieval_question(
         self,
@@ -264,8 +288,10 @@ class AnswerQuestionUseCase:
         ):
             return question.content
 
-        rewritten_question = await self.llm.generate(
-            self._build_query_rewrite_prompt(question, detected_language)
+        rewritten_question = await self._run_controlled(
+            lambda: self.llm.generate(
+                self._build_query_rewrite_prompt(question, detected_language)
+            ),
         )
 
         return self._clean_retrieval_question( # limpio la question reescrita por si el modelo lo devuelve entre comillas o con espacios extra
@@ -297,14 +323,16 @@ class AnswerQuestionUseCase:
                     return cached_answer
 
         for cached_answer in cache_candidates:
-            judgement = await self.llm.generate_structured(
-                prompt=self._build_cache_context_judge_prompt(
-                    question=question,
-                    retrieval_question=retrieval_question,
-                    cached_answer=cached_answer,
-                    detected_language=detected_language,
+            judgement = await self._run_controlled(
+                lambda: self.llm.generate_structured(
+                    prompt=self._build_cache_context_judge_prompt(
+                        question=question,
+                        retrieval_question=retrieval_question,
+                        cached_answer=cached_answer,
+                        detected_language=detected_language,
+                    ),
+                    output_schema=CacheContextJudgement,
                 ),
-                output_schema=CacheContextJudgement,
             )
 
             if judgement.can_reuse_cached_answer: # caso de que efectivamente habia una consulta igual, y por la similitud de los contextos se puede responder exactamente igual
@@ -630,7 +658,7 @@ class AnswerQuestionUseCase:
         answer: str,
         expected_language: str,
     ) -> bool:
-        answer_language = self.language_detector.detect(answer)
+        answer_language = self._detect_language(answer)
 
         if not self._is_reliable_language(answer_language):
             return False
@@ -657,9 +685,11 @@ class AnswerQuestionUseCase:
         if not self._uses_conversation_history():
             return question
 
-        stored_history = await self.conversation_store.get_recent(
-            conversation_key=self._conversation_key(question),
-            limit=self.config.conversation_history_limit,
+        stored_history = await self._run_controlled(
+            lambda: self.conversation_store.get_recent(
+                conversation_key=self._conversation_key(question),
+                limit=self.config.conversation_history_limit,
+            ),
         )
 
         return UserQuestion(
@@ -675,16 +705,18 @@ class AnswerQuestionUseCase:
         if not self._uses_conversation_history():
             return answer
 
-        await self.conversation_store.append(
-            conversation_key=self._conversation_key(answer.question),
-            messages=(
-                ConversationMessage(
-                    role="user",
-                    content=answer.question.content,
-                ),
-                ConversationMessage(
-                    role="assistant",
-                    content=answer.content,
+        await self._run_controlled(
+            lambda: self.conversation_store.append(
+                conversation_key=self._conversation_key(answer.question),
+                messages=(
+                    ConversationMessage(
+                        role="user",
+                        content=answer.question.content,
+                    ),
+                    ConversationMessage(
+                        role="assistant",
+                        content=answer.content,
+                    ),
                 ),
             ),
         )
@@ -754,6 +786,25 @@ class AnswerQuestionUseCase:
 
     def _conversation_key(self, question: UserQuestion) -> str:
         return self._normalize_text(question.user_name)
+
+    async def _run_controlled(
+        self,
+        call: Callable[[], Awaitable[ServiceResult]],
+    ) -> ServiceResult:
+        try:
+            return await call()
+        except ExternalServiceError:
+            raise
+        except Exception as error:
+            raise ExternalServiceError(
+                cause=str(error) or error.__class__.__name__,
+            ) from error
+
+    def _detect_language(self, text: str) -> DetectedLanguage | None:
+        try:
+            return self.language_detector.detect(text)
+        except Exception:
+            return None
 
     def _language_key(self, language_name: str) -> str:
         return language_name.strip().casefold()

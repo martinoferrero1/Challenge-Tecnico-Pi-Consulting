@@ -8,6 +8,7 @@ from app.api.mappers.question_mapper import (
     map_question_request_to_entity,
 )
 from app.api.schemas.question_schema import AnswerResponse, QuestionRequest
+from app.application.errors import ExternalServiceError
 from app.application.use_cases.answer_question import AnswerQuestionUseCase
 
 router = APIRouter(prefix="/questions", tags=["questions"])
@@ -19,6 +20,9 @@ router = APIRouter(prefix="/questions", tags=["questions"])
     responses={
         status.HTTP_400_BAD_REQUEST: {
             "description": "Invalid question request",
+        },
+        status.HTTP_503_SERVICE_UNAVAILABLE: {
+            "description": "External service unavailable",
         },
     },
 )
@@ -37,6 +41,11 @@ async def answer_question(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(error),
+        ) from error
+    except ExternalServiceError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=error.to_detail(),
         ) from error
 
     return map_answer_to_response(answer)

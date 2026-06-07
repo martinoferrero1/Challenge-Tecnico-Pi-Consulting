@@ -1,6 +1,10 @@
 import asyncio
 from typing import Sequence, TypeVar
 
+import pytest
+from pydantic import BaseModel
+
+from app.application.errors import ExternalServiceError
 from app.application.use_cases.answer_question import (
     AnswerQuestionConfig,
     AnswerQuestionUseCase,
@@ -15,7 +19,6 @@ from app.domain.entities.retrieval import RetrievedChunk
 from app.infrastructure.conversation_stores.in_memory_conversation_store import (
     InMemoryConversationStore,
 )
-from pydantic import BaseModel
 
 
 StructuredOutput = TypeVar("StructuredOutput", bound=BaseModel)
@@ -31,6 +34,11 @@ class FakeEmbeddingModel:
 
     async def embed_batch(self, texts: Sequence[str]) -> list[list[float]]:
         return [[1.0] for _ in texts]
+
+
+class FailingEmbeddingModel(FakeEmbeddingModel):
+    async def embed_text(self, text: str) -> list[float]:
+        raise RuntimeError("embedding provider is down")
 
 
 class FakeVectorStore:
@@ -186,6 +194,25 @@ def test_answer_question_returns_fallback_when_no_context_is_found() -> None:
     assert "You must answer in English." in llm.prompts[0]
     assert "exactly one sentence" in llm.prompts[0]
     assert "relevant emojis" in llm.prompts[0]
+
+
+def test_answer_question_wraps_embedding_failures() -> None:
+    use_case = AnswerQuestionUseCase(
+        embedding_model=FailingEmbeddingModel(),
+        vector_store=FakeVectorStore([]),
+        llm=FakeLLM(),
+        answer_cache=FakeAnswerCache(),
+        language_detector=FakeLanguageDetector(
+            DetectedLanguage(name="Spanish", confidence=0.99)
+        ),
+    )
+
+    with pytest.raises(ExternalServiceError) as error:
+        asyncio.run(
+            use_case.execute(UserQuestion(user_name="Ana", content="Que es Zara?"))
+        )
+
+    assert error.value.cause == "embedding provider is down"
 
 
 def test_answer_question_does_not_pin_language_when_confidence_is_low() -> None:

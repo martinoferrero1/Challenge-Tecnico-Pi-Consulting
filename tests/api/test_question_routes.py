@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.api.dependencies import get_answer_question_use_case
+from app.application.errors import ExternalServiceError
 from app.domain.entities.answer import Answer
 from app.domain.entities.question import UserQuestion
 from app.main import app
@@ -16,6 +17,13 @@ class FakeAnswerQuestionUseCase:
             question=question,
             content="Zara es una empresa de moda.",
             context=(),
+        )
+
+
+class FailingAnswerQuestionUseCase:
+    async def execute(self, question: UserQuestion) -> Answer:
+        raise ExternalServiceError(
+            cause="LLM provider is unavailable",
         )
 
 
@@ -45,3 +53,31 @@ def test_answer_question_endpoint_uses_injected_use_case() -> None:
     assert use_case.questions == [
         UserQuestion(user_name="Ana", content="Que es Zara?"),
     ]
+
+
+def test_answer_question_endpoint_returns_controlled_external_service_error() -> None:
+    previous_overrides = dict(app.dependency_overrides)
+    app.dependency_overrides[get_answer_question_use_case] = (
+        lambda: FailingAnswerQuestionUseCase()
+    )
+
+    try:
+        response = TestClient(app).post(
+            "/api/questions",
+            json={
+                "user_name": "Ana",
+                "question": "Que es Zara?",
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(previous_overrides)
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": {
+            "code": "question_processing_error",
+            "message": "The question could not be processed.",
+            "cause": "LLM provider is unavailable",
+        }
+    }

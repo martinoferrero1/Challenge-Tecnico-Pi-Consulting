@@ -1,0 +1,6 @@
+{"id":"cache-001","conversation":"cache-flor","question":"Como se llama la flor magica de la selva amazonica?","notes":"Primera ejecucion; deberia generar respuesta."}
+{"id":"cache-002","conversation":"cache-flor","question":"Como se llama la flor magica de la selva amazonica?","notes":"Misma pregunta exacta; util para observar hit en ANSWER_CACHE_MODE=question."}
+{"id":"cache-003","conversation":"cache-heroe","question":"Que habilidades tiene Sombra Silenciosa?","notes":"Primera ejecucion sobre el heroe."}
+{"id":"cache-004","conversation":"cache-heroe","question":"Que habilidades tiene Sombra Silenciosa?","notes":"Misma pregunta exacta; deberia reutilizar cache en modo question."}
+{"id":"cache-005","conversation":"cache-emma","question":"Quien es elegido por el reloj antiguo?","notes":"Primera ejecucion sobre el cuento corto."}
+{"id":"cache-006","conversation":"cache-emma","question":"Quien es elegido por el reloj antiguo?","notes":"Misma pregunta exacta; deberia reutilizar cache en modo question."}

@@ -1,0 +1,10 @@
+{"id":"conv-001","conversation":"space-discovery","question":"Hablemos de la ficcion espacial. Quien es Zara?","notes":"Establece el contexto de Zara."}
+{"id":"conv-002","conversation":"space-discovery","question":"Que descubre?","notes":"Pregunta eliptica; deberia resolver a lo que descubre Zara."}
+{"id":"conv-003","conversation":"tech-discovery","question":"Hablemos de la ficcion tecnologica. Quien es Alex?","notes":"Establece el contexto de Alex."}
+{"id":"conv-004","conversation":"tech-discovery","question":"Que descubre?","notes":"Misma pregunta que conv-002, pero con otro referente; util para context_aware."}
+{"id":"conv-005","conversation":"nature-flower","question":"Como se llama la flor magica de la selva amazonica?","notes":"Establece contexto de la flor."}
+{"id":"conv-006","conversation":"nature-flower","question":"Cuando florece?","notes":"Pregunta eliptica sobre la Luz de Luna."}
+{"id":"conv-007","conversation":"nature-flower","question":"Que creen los lugarenos sobre ella?","notes":"Pronombre ella; deberia usar memoria conversacional."}
+{"id":"conv-008","conversation":"silent-shadow","question":"Quien es Sombra Silenciosa?","notes":"Establece contexto del Heroe Olvidado."}
+{"id":"conv-009","conversation":"silent-shadow","question":"Tiene habilidades sobrenaturales?","notes":"Pregunta con sujeto omitido."}
+{"id":"conv-010","conversation":"silent-shadow","question":"Entonces que lo vuelve una fuerza a tener en cuenta?","notes":"Pregunta eliptica que depende del turno anterior."}

@@ -1,33 +1,14 @@
-# API run datasets
+# Datasets para ejecutar la API
 
-These JSONL datasets run ordered question sequences against the API using
-content from `data/original_document.docx`.
+Estos datasets JSONL ejecutan secuencias ordenadas de preguntas contra la API usando contenido de `data/original_document.docx`.
 
-The script prints and saves every response, and also calculates lightweight RAG
-metrics for each run.
+El script imprime y guarda cada respuesta, y también calcula métricas RAG livianas para cada ejecución.
 
-## Recommended mode/dataset pairs
+## Pares recomendados de modo/dataset
 
-### Direct document context
+### mod1: Caché por pregunta exacta
 
-Use:
-
-```env
-CONVERSATION_CONTEXT_MODE=disabled
-ANSWER_CACHE_MODE=document_context
-```
-
-Dataset:
-
-```text
-data/evaluation/direct_document_context.jsonl
-```
-
-This runs direct standalone questions where retrieval should be enough.
-
-### Exact question cache
-
-Use:
+Usar:
 
 ```env
 CONVERSATION_CONTEXT_MODE=disabled
@@ -37,14 +18,31 @@ ANSWER_CACHE_MODE=question
 Dataset:
 
 ```text
-data/evaluation/question_cache_exact.jsonl
+data/evaluation/mod1.jsonl
 ```
 
-This repeats exact questions so you can observe cache behavior and latency.
+Este dataset repite preguntas exactas para poder observar el comportamiento de la caché, la latencia y el trade-off de reutilizar respuestas sin contexto del documento ni contexto conversacional.
 
-### Conversational context-aware cache
+### mod2: Contexto directo del documento
 
-Use:
+Usar:
+
+```env
+CONVERSATION_CONTEXT_MODE=disabled
+ANSWER_CACHE_MODE=document_context
+```
+
+Dataset:
+
+```text
+data/evaluation/mod2.jsonl
+```
+
+Este dataset ejecuta preguntas directas e independientes, donde la recuperación de información debería ser suficiente. Es la configuración base de RAG, porque la reutilización de caché depende del contexto recuperado del documento.
+
+### mod3: Caché sensible al contexto conversacional
+
+Usar:
 
 ```env
 CONVERSATION_CONTEXT_MODE=rewrite
@@ -55,87 +53,81 @@ CONVERSATION_HISTORY_LIMIT=10
 Dataset:
 
 ```text
-data/evaluation/conversational_context_aware.jsonl
+data/evaluation/mod3.jsonl
 ```
 
-This sends multi-turn conversations without passing conversation history in
-the request. The API keeps the conversation in memory while the process is
-running.
+Este dataset envía conversaciones de múltiples turnos sin pasar el historial conversacional en la request. La API mantiene la conversación en memoria mientras el proceso está en ejecución. Sirve para probar la reescritura de consultas y el paso de LLM-as-a-judge usado por `ANSWER_CACHE_MODE=context_aware`.
 
-## Running
+Estos tres datasets están intencionalmente asociados a las tres configuraciones bajo prueba: caché por pregunta exacta (`mod1`), RAG directo con contexto del documento (`mod2`) y caché sensible al contexto conversacional con reescritura y judge (`mod3`).
 
-Start the API with the `.env` configuration you want to test, then run:
+## Ejecución
 
-```powershell
-.\.venv\Scripts\python app\scripts\run_api_evaluation.py --dataset data\evaluation\conversational_context_aware.jsonl
+Iniciá la API con la configuración del `.env` que quieras probar y luego ejecutá:
+
+```sh
+python -m app.scripts.run_api_evaluation --dataset data/evaluation/mod3.jsonl
 ```
 
-Or run all datasets:
+O ejecutá todos los datasets:
 
-```powershell
-.\.venv\Scripts\python app\scripts\run_api_evaluation.py
+```sh
+python -m app.scripts.run_api_evaluation
 ```
 
-The script prints results in request order and writes JSONL output to:
+El script imprime los resultados en el orden de las requests y escribe la salida JSONL en:
 
 ```text
 data/evaluation/results/
 ```
 
-It also writes metrics summaries and Prometheus text files to:
+También escribe resúmenes de métricas y archivos de texto Prometheus en:
 
 ```text
 data/evaluation/metrics/
 ```
 
-To group metrics from a run in a named folder:
+Para agrupar las métricas de una ejecución en una carpeta con nombre:
 
-```powershell
-.\.venv\Scripts\python app\scripts\run_api_evaluation.py --dataset data\evaluation\question_cache_exact.jsonl --metrics-run-name cache-question-mode
+```sh
+python -m app.scripts.run_api_evaluation --dataset data/evaluation/mod1.jsonl --metrics-run-name cache-question-mode
 ```
 
-That writes metrics to:
+Eso escribe las métricas en:
 
 ```text
 data/evaluation/metrics/cache-question-mode/
 ```
 
-Each run uses unique `user_name` values so in-memory conversations from one
-run do not mix with another run.
+Cada ejecución usa valores únicos de `user_name`, para que las conversaciones en memoria de una ejecución no se mezclen con las de otra.
 
-## Metrics
+## Métricas
 
-The datasets include `expected_sections`, which makes these retrieval metrics
-available:
+Los datasets incluyen `expected_sections`, lo que permite calcular estas métricas de recuperación:
 
-- `Recall@K`
-- `MRR`
-- `Context relevance`
+* `Recall@K`
+* `MRR`
+* `Context relevance`
 
-The script also computes automatic lexical approximations for:
+El script también calcula aproximaciones léxicas automáticas para:
 
-- `Groundedness`
-- `Answer relevance`
+* `Groundedness`
+* `Answer relevance`
 
-Operational metrics are measured directly:
+Las métricas operacionales se miden directamente:
 
-- `Latency total`
-- `Latency by stage`, when the API returns diagnostics
-- `Estimated tokens per request`
-- `Error rate`
-- `Prompt injection attempts detected`
-- `Cache hit rate`
+* `Latency total`
+* `Latency by stage`, cuando la API devuelve diagnósticos
+* `Estimated tokens per request`
+* `Error rate`
+* `Prompt injection attempts detected`
+* `Cache hit rate`
 
-`Citation accuracy` is emitted only when answers include bracket citations that
-can be compared with `expected_sections`. The current answer prompt does not ask
-for citations, so this metric will usually be `null`.
+`Citation accuracy` se emite solo cuando las respuestas incluyen citas entre corchetes que puedan compararse con `expected_sections`. El prompt actual de respuesta no solicita citas, por lo que esta métrica normalmente será `null`.
 
-Use `--k` to change the K used by `Recall@K` and `MRR`:
+Usá `--k` para cambiar el valor de K usado por `Recall@K` y `MRR`:
 
-```powershell
-.\.venv\Scripts\python app\scripts\run_api_evaluation.py --dataset data\evaluation\direct_document_context.jsonl --k 4
+```sh
+python -m app.scripts.run_api_evaluation --dataset data/evaluation/mod2.jsonl --k 4
 ```
 
-The `.prom` files use Prometheus exposition format. To view them in Grafana, the
-simplest path is to have Prometheus scrape or load those metrics, then add
-Prometheus as a Grafana data source.
+Los archivos `.prom` usan el formato de exposición de Prometheus. Para verlos en Grafana, el camino más simple es hacer que Prometheus scrapee o cargue esas métricas, y luego agregar Prometheus como fuente de datos en Grafana.

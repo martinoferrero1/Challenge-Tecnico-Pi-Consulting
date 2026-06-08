@@ -29,12 +29,14 @@ El proyecto está pensado como una solución simple pero extensible: la API púb
 - [Decisiones sobre el documento default](#decisiones-sobre-el-documento-default)
 - [Instalación local](#instalación-local)
 - [Evaluación con datasets](#evaluación-con-datasets)
+- [Comparación de contexto conversacional](#comparación-de-contexto-conversacional)
 - [Métricas incluidas](#métricas-incluidas)
 
 ## Tecnologías
 
 - Python 3.12
 - FastAPI y Uvicorn
+- Streamlit para frontend opcional
 - Pydantic y pydantic-settings
 - ChromaDB como vector store persistente
 - LangChain para loaders/splitters/adapters de embeddings
@@ -51,6 +53,7 @@ El proyecto sigue una organización cercana a Clean Architecture:
 - `app/application`: casos de uso y puertos. Acá vive la lógica principal de responder preguntas, indexar documentos, guardar conversación, consultar cache y medir el flujo RAG.
 - `app/infrastructure`: adapters concretos para Chroma, LLMs, embeddings, loader DOCX, language detector, cache en memoria y conversation store en memoria.
 - `app/api`: rutas FastAPI, schemas y mappers entre HTTP y dominio.
+- `app/frontend`: frontend Streamlit opcional para conversar con la API.
 - `app/scripts`: scripts operativos para indexar, evaluar datasets y levantar el proyecto con tests.
 - `tests`: pruebas unitarias y de integración liviana por capa.
 
@@ -66,13 +69,15 @@ app/
     use_cases/          Casos de uso de RAG, ingesta e indexación
   core/                 Configuración por variables de entorno
   domain/entities/      Entidades puras del dominio
+  frontend/             UI opcional en Streamlit
   infrastructure/       Adapters concretos para LLM, embeddings, Chroma, DOCX
   scripts/              Scripts operativos y evaluación
+assets/                 Contiene algunas imágenes de documentación utilizadas por el README
 data/
   original_document.docx
   evaluation/           Datasets, resultados y métricas
 tests/                  Tests por capa
-postman/                Colección importable
+postman/                Contiene dos colecciones de ejemplo importables
 ```
 
 La dependencia apunta hacia adentro: `api` e `infrastructure` conocen `application`, `application` conoce `domain`, y `domain` no conoce ninguna capa externa.
@@ -159,9 +164,9 @@ Respuesta pública:
 
 Ejemplo con `curl`:
 
-```powershell
-curl -X POST "http://127.0.0.1:8000/api/questions" `
-  -H "Content-Type: application/json" `
+```sh
+curl -X POST "http://127.0.0.1:8000/api/questions" \
+  -H "Content-Type: application/json" \
   -d "{\"user_name\":\"martin\",\"question\":\"What is the name of the magical flower?\"}"
 ```
 
@@ -215,10 +220,13 @@ LLM_PROVIDER=openai
 EMBEDDING_PROVIDER=openai
 OPENAI_API_KEY=...
 OPENAI_LLM_MODEL=gpt-5.5
+LLM_TEMPERATURE=0
+JUDGE_LLM_PROVIDER=
+JUDGE_LLM_MODEL=
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 ```
 
-Configuración recomendada para probar con el documento de ejemplo:
+Configuración recomendada para probar con el documento de ejemplo (documento provisto para el ejercicio, para el cual se creó una auto configuración básica para el flujo RAG, como se detalla en el documento):
 
 ```env
 SOURCE_DOCUMENT_PATH=./data/original_document.docx
@@ -241,7 +249,7 @@ CONVERSATION_CONTEXT_MODE=rewrite
 ANSWER_CACHE_MODE=context_aware
 ```
 
-No se recomienda guardar API keys reales en archivos versionados. Para correr localmente, copiar `.env.example` a `.env` y reemplazar `your-cohere-api-key` por una key propia.
+Para correr localmente, copiar `.env.example` a `.env` y reemplazar `your-cohere-api-key` por una key propia.
 
 Variables principales:
 
@@ -258,6 +266,9 @@ Variables principales:
 - `LANGUAGE_CONFIDENCE_THRESHOLD`: confianza mínima para forzar un idioma detectado.
 - `ANSWER_VALIDATION_RETRIES`: permite 0 o 1 reintento de formato.
 - `LLM_PROVIDER`: proveedor del LLM, actualmente `openai`, `cohere` o `gemini`.
+- `LLM_TEMPERATURE`: temperatura del LLM. Por defecto queda en `0` para priorizar respuestas reproducibles y comparables en evaluación.
+- `JUDGE_LLM_PROVIDER`: proveedor opcional para el LLM-as-a-judge del modo `ANSWER_CACHE_MODE=context_aware`. Si queda vacío, usa `LLM_PROVIDER`.
+- `JUDGE_LLM_MODEL`: modelo opcional para el judge. Si queda vacío, usa el modelo principal del provider elegido para el judge.
 - `EMBEDDING_PROVIDER`: proveedor de embeddings, actualmente `openai`, `cohere` o `gemini`.
 
 ## Modos de conversación
@@ -373,9 +384,9 @@ No se incluyó persistencia durable de conversaciones ni cache porque para la co
 
 Quickstart:
 
-```powershell
+```sh
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+. .venv/bin/activate
 python -m pip install -r requirements.txt
 python -m app.scripts.index_document
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
@@ -383,9 +394,9 @@ python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 Crear entorno e instalar dependencias:
 
-```powershell
+```sh
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+. .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
@@ -394,13 +405,13 @@ Configurar `.env` con el proveedor elegido y las API keys necesarias.
 
 Indexar el documento:
 
-```powershell
+```sh
 python -m app.scripts.index_document
 ```
 
 Levantar la API:
 
-```powershell
+```sh
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
@@ -410,47 +421,114 @@ Swagger queda disponible en:
 http://127.0.0.1:8000/docs
 ```
 
-## Script de tests y arranque
+## Script de tests y arranque (no recomendado levantar así, sino con los scripts que utilizan docker más abajo)
 
 El script:
 
 ```text
-app/scripts/start_project_and_tests.ps1
+app/scripts/start_project_and_tests.sh
 ```
 
-corre los tests y, si pasan, levanta la API.
+corre los tests, reindexa el documento y, si todo pasa, levanta la API. El script cambia primero a la raíz del repo para que `.env`, `data/` y `.chroma` se resuelvan siempre igual aunque el comando se ejecute desde otra carpeta.
+
+En Windows/Git Bash se observó un crash nativo de Chroma durante indexación (`chromadb.api.rust._upsert`). Por eso, para correr local sin Docker se recomienda usar Linux o WSL. En Windows, usar el script Docker:
+
+```sh
+sh app/scripts/start_project_docker.sh
+```
 
 Uso:
 
-```powershell
-.\app\scripts\start_project_and_tests.ps1
+```sh
+sh app/scripts/start_project_and_tests.sh
 ```
 
 Con otro puerto:
 
-```powershell
-.\app\scripts\start_project_and_tests.ps1 -Port 8001
+```sh
+sh app/scripts/start_project_and_tests.sh --port 8001
 ```
 
 Sin correr tests:
 
-```powershell
-.\app\scripts\start_project_and_tests.ps1 -SkipTests
+```sh
+sh app/scripts/start_project_and_tests.sh --skip-tests
 ```
 
-## Docker
+Sin reindexar:
 
-También se puede levantar con Docker Compose:
+```sh
+sh app/scripts/start_project_and_tests.sh --skip-index
+```
 
-```powershell
+Si `GET /api/health` responde pero `POST /api/questions` falla o corta la conexión, suele indicar que la parte RAG falló al tocar vector store, embeddings o LLM. Por eso el script reindexa por defecto.
+
+## Docker (recomendado levantar con alguna de estas opciones)
+
+Requerimiento: El daemon de Docker debe estar levantado antes de usar estos comandos.
+
+### Solo backend con script
+
+```sh
+sh app/scripts/start_project_docker.sh
+```
+
+El backend queda disponible en:
+
+```text
+http://127.0.0.1:8000
+```
+
+### Backend y frontend con Docker Compose
+
+Manual:
+
+```sh
 docker compose up --build
 ```
 
-El compose indexa el documento antes de iniciar Uvicorn y monta `data` como lectura.
+Con script:
+
+```sh
+sh app/scripts/start_project_docker.sh --frontend
+```
+
+URLs:
+
+```text
+API: http://127.0.0.1:8000
+Frontend Streamlit: http://127.0.0.1:8501
+```
+
+El frontend expone un chat simple contra `POST /api/questions`, muestra los mensajes de usuario/asistente y mantiene un indicador de espera mientras responde el RAG.
+
+### Opciones del script Docker
+
+Modo detached:
+
+```sh
+sh app/scripts/start_project_docker.sh --detached
+sh app/scripts/start_project_docker.sh --frontend --detached
+```
+
+Saltar build:
+
+```sh
+sh app/scripts/start_project_docker.sh --no-build
+sh app/scripts/start_project_docker.sh --frontend --no-build
+```
+
+Bajar contenedores:
+
+```sh
+sh app/scripts/start_project_docker.sh --down
+```
+
+Tanto el modo Dockerfile como Compose indexan el documento antes de iniciar Uvicorn y montan `data` como lectura.
 
 ## Tests
 
-```powershell
+```sh
 python -m pytest
 ```
 
@@ -458,8 +536,8 @@ Los tests cubren dominio, casos de uso, rutas, mappers, adapters principales, fa
 
 Comando recomendado usando el entorno local:
 
-```powershell
-.\.venv\Scripts\python.exe -m pytest
+```sh
+.venv/bin/python -m pytest
 ```
 
 ## Evaluación con datasets
@@ -470,21 +548,31 @@ Los datasets están en:
 data/evaluation/*.jsonl
 ```
 
+Las tres configuraciones con dataset cubren el comportamiento principal que vale la pena comparar:
+
+| Dataset | Configuración | Qué prueba |
+| --- | --- | --- |
+| `mod1.jsonl` | `CONVERSATION_CONTEXT_MODE=disabled`, `ANSWER_CACHE_MODE=question` | Cache exacta por pregunta, útil para medir latencia y el riesgo de reutilizar sin contexto. |
+| `mod2.jsonl` | `CONVERSATION_CONTEXT_MODE=disabled`, `ANSWER_CACHE_MODE=document_context` | Baseline RAG directo, donde retrieval y contexto documental son suficientes. |
+| `mod3.jsonl` | `CONVERSATION_CONTEXT_MODE=rewrite`, `ANSWER_CACHE_MODE=context_aware` | Conversaciones multi-turn con query rewrite y judge de cache contextual. |
+
+Se eligieron esas tres porque aíslan las decisiones principales del sistema: cache barata por texto exacto, cache alineada al contexto recuperado, y flujo conversacional con judge cuando la misma pregunta puede referir a cosas distintas.
+
 Ejecutar un dataset:
 
-```powershell
-python -m app.scripts.run_api_evaluation --dataset data\evaluation\question_cache_exact.jsonl
+```sh
+python -m app.scripts.run_api_evaluation --dataset data/evaluation/mod1.jsonl
 ```
 
 Ejecutar todos los datasets:
 
-```powershell
+```sh
 python -m app.scripts.run_api_evaluation
 ```
 
 Guardar métricas en una carpeta nombrada:
 
-```powershell
+```sh
 python -m app.scripts.run_api_evaluation --metrics-run-name context-aware-test
 ```
 
@@ -513,6 +601,48 @@ data/evaluation/metrics/<metrics-run-name>/
 ```
 
 si se pasa `--metrics-run-name`.
+
+Nota: como las respuestas incluyen emojis, si se corre en una terminal que no tiene buen soporte UTF-8 y emojis, puede que no se vean del todo bien (sí tiene este soporte por ejemplo PowerShell, Windows Terminal o WSL). De todos modos si luego se abren los archivos de los resultados en un entorno que sí lo soporta, se podrán ver sin problema.
+
+## Comparación de contexto conversacional
+
+Esta comparación muestra el caso donde una pregunta textual igual puede depender de un contexto conversacional distinto (se mantiene el resto de la configuración básica para el documento default). Es el escenario que motiva separar el modo rápido de cache exacta del modo conversacional con rewrite y judge.
+
+### Configuración 1: cache exacta por pregunta
+
+```env
+CONVERSATION_CONTEXT_MODE=disabled
+ANSWER_CACHE_MODE=question
+```
+
+Esta configuración corresponde a la no utilización de contexto, tanto para responder como para cachear (la misma que se utiliza en el dataset de prueba con `mod1.jsonl`). Es eficiente y poco costosa, pero no usa historial ni evalúa si la misma frase apunta a otra entidad, momento o hecho.
+
+El siguiente es un ejemplo de cómo falla ante una conversación contextual:
+
+![Corrida con cache exacta por pregunta-p1](assets/context-comparison/question-cache-context-dependent-p1.png)
+
+
+### Configuración 2: rewrite conversacional y cache context-aware
+
+```env
+CONVERSATION_CONTEXT_MODE=rewrite
+ANSWER_CACHE_MODE=context_aware
+```
+
+Esta configuración corresponde a la utilización del contexto, tanto para responder como para cachear, además del uso de la técnica de query rewriting para optimizar la comparación con mensajes del historial y la respuesta del llm (la misma que se utiliza en el dataset de prueba con `mod3.jsonl`). Primero reescribe preguntas dependientes del historial como preguntas standalone para retrieval y, cuando encuentra una pregunta cacheada con texto equivalente, usa un judge estructurado para decidir si la respuesta se puede reutilizar o si el contexto cambió.
+
+![Corrida con rewrite conversacional y cache context-aware-p1](assets/context-comparison/context-aware-context-dependent-p1.png)
+![Corrida con rewrite conversacional y cache context-aware-p2](assets/context-comparison/context-aware-context-dependent-p2.png)
+
+En preguntas que referencian al contexto (como en el caso de "y que hace?" en el ejemplo), la segunda configuración es más robusta porque resuelve el referente antes de recuperar contexto y evita que una respuesta cacheada para otra conversación se reutilice solo porque el texto de la pregunta coincide.
+
+También se puede ver en el siguiente ejemplo (que refiere a esta configuración en cuestión), cómo se puede interpretar un caso dónde sí encuentra una respuesta cacheada que determina que hace referencia al mismo contexto, mientras que las anteriores no.
+
+![Corrida con rewrite conversacional y cache context-aware-p3](assets/context-comparison/context-aware-context-dependent-p3.png)
+![Corrida con rewrite conversacional y cache context-aware-p4](assets/context-comparison/context-aware-context-dependent-p4.png)
+![Corrida con rewrite conversacional y cache context-aware-p5](assets/context-comparison/context-aware-context-dependent-p5.png)
+
+Se puede ver cómo para la consulta de "contame lo mas interesante sobre eso", en el caso de Sombra Silenciosa sí reutiliza la respuesta cacheada, mientras que para las anteriores no. 
 
 ## Métricas incluidas
 
@@ -555,14 +685,24 @@ Métricas especialmente útiles para Grafana:
 - `rag_eval_tokens_estimated_total`
 - `rag_eval_prompt_injection_attempts_detected_total`
 
+## Colecciones Postman
+
+En la carpeta `postman/` hay 2 archivos que se pueden importar en Postman para probar la API con algunas secuencias de ejemplo adicionales:
+
+- `Challenge Pi Consulting - Simple Check.postman_collection.json`: permite probar las consultas de manera simple.
+- `Challenge Pi Consulting - Complete Check With Diagnostics.postman_collection.json`: permite probar la misma secuencia de mensajes, pero usando el endpoint con diagnósticos simples agregados.
+
+Nota: Estos no reemplazan los datasets específicos de testing para las 3 configuraciones de contexto y cacheo mencionadas anteriormente, que se pueden testear con los datasets de ejemplo para ello (son distintos).
+
 ## Contenido de la entrega
 
-- API documentada en Swagger en `/docs`.
+- API documentada en Swagger en mediante endpoint.
 - Documento default indexable desde script.
 - Endpoint público sin diagnósticos internos.
 - Endpoint de evaluación con diagnósticos para métricas.
+- Frontend Streamlit opcional para conversar con la API.
 - Tests automatizados con pytest.
-- Script PowerShell para correr tests y levantar API.
+- Scripts `sh` para correr tests, indexar, levantar la API local, ejecutar backend Docker y ejecutar API + frontend con Docker Compose.
 - Datasets JSONL de ejemplo.
 - Métricas exportadas a JSON y Prometheus.
 - Colección Postman.

@@ -47,7 +47,7 @@ El proyecto está pensado como una solución simple pero extensible: la API púb
 
 ## Arquitectura
 
-El proyecto sigue una organización cercana a Clean Architecture:
+El proyecto sigue una organización basada en Clean Architecture (aunque un poco simplificada sin ciertas capas como presenters, dado que es un proyecto pequeño):
 
 - `app/domain`: entidades puras del negocio, como `UserQuestion`, `Answer`, `Document`, `DocumentChunk`, `RetrievedChunk` y claves de cache.
 - `app/application`: casos de uso y puertos. Acá vive la lógica principal de responder preguntas, indexar documentos, guardar conversación, consultar cache y medir el flujo RAG.

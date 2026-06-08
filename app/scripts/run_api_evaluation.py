@@ -3,6 +3,7 @@ import json
 import math
 import os
 import re
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -73,6 +74,8 @@ STOPWORDS = {
 
 def main() -> None:
     """Ejecuta datasets contra la API y guarda resultados y métricas."""
+    configure_console_encoding()
+
     args = parse_args()
     run_id = args.run_id or datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     dataset_paths = resolve_dataset_paths(args.datasets)
@@ -132,6 +135,17 @@ def main() -> None:
         print("")
         print(f"Saved run summary: {run_summary_path}")
         print(f"Saved run Prometheus metrics: {run_prometheus_path}")
+
+
+def configure_console_encoding() -> None:
+    """Configura stdout/stderr en UTF-8 cuando la terminal lo permite.
+
+    En Windows/Git Bash algunas terminales pueden usar cp1252 por defecto,
+    lo que rompe los print() cuando la respuesta contiene emojis.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
 
 
 def parse_args() -> argparse.Namespace:

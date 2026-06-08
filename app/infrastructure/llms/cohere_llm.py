@@ -16,6 +16,7 @@ class CohereLLM:
         self,
         api_key: str,
         model: str,
+        temperature: float = 0.0,
         client: Any | None = None,
     ) -> None:
         """Guarda configuración y permite inyectar cliente para tests.
@@ -23,14 +24,16 @@ class CohereLLM:
         Args:
             api_key: API key de Cohere.
             model: Nombre del modelo de chat.
+            temperature: Temperatura de generación del modelo.
             client: Cliente compatible con LangChain, opcional para tests.
         """
         self.api_key = api_key
         self.model = model
+        self.temperature = temperature
         self.client = client
 
     async def generate(self, prompt: str) -> str:
-        """Genera texto libre con temperatura determinística.
+        """Genera texto libre con la temperatura configurada.
 
         Args:
             prompt: Prompt completo enviado al modelo.
@@ -79,7 +82,7 @@ class CohereLLM:
             self.client = ChatCohere(
                 cohere_api_key=self.api_key,
                 model=self.model,
-                temperature=0,
+                temperature=self.temperature,
             )
 
         return self.client

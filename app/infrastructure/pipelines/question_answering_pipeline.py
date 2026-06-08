@@ -56,6 +56,9 @@ class AnswerQuestionSettings(Protocol):
     language_confidence_threshold: float
     answer_validation_retries: int
     llm_provider: str
+    llm_temperature: float
+    judge_llm_provider: str | None
+    judge_llm_model: str | None
     embedding_provider: str
     openai_api_key: str | None
     openai_llm_model: str
@@ -83,13 +86,28 @@ def create_answer_question_use_case(
     Returns:
         Caso de uso listo para responder preguntas.
     """
+    llm = create_llm(settings)
+    judge_llm_provider = getattr(settings, "judge_llm_provider", None)
+    judge_llm_model = getattr(settings, "judge_llm_model", None)
+    has_judge_provider = bool(judge_llm_provider and judge_llm_provider.strip())
+    has_judge_model = bool(judge_llm_model and judge_llm_model.strip())
+    cache_judge_llm = (
+        create_llm(
+            settings,
+            provider_override=judge_llm_provider,
+            model_override=judge_llm_model,
+        )
+        if has_judge_provider or has_judge_model
+        else llm
+    )
+
     return AnswerQuestionUseCase(
         embedding_model=create_embedding_model(settings),
         vector_store=ChromaVectorStore(
             persist_dir=settings.chroma_persist_dir,
             collection_name=settings.chroma_collection_name,
         ),
-        llm=create_llm(settings),
+        llm=llm,
         answer_cache=get_answer_cache(),
         language_detector=LinguaLanguageDetector(),
         conversation_store=get_conversation_store(),
@@ -101,6 +119,7 @@ def create_answer_question_use_case(
             language_confidence_threshold=settings.language_confidence_threshold,
             answer_validation_retries=settings.answer_validation_retries,
         ),
+        cache_judge_llm=cache_judge_llm,
     )
 
 

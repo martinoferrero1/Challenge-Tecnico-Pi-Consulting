@@ -1,9 +1,13 @@
+import logging
 from dataclasses import dataclass
 
 from app.application.ports.document_chunker import DocumentChunkerPort
 from app.application.ports.document_loader import DocumentLoaderPort
 from app.domain.entities.document import Document
 from app.domain.entities.document_chunk import DocumentChunk
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -50,7 +54,7 @@ class IngestDocumentUseCase:
         Raises:
             ValueError: Si ``source`` queda vacío.
         """
-        print(f"Loading document from source: {source}")
+        logger.info("Loading document from source: %s", source)
         if not source.strip():
             raise ValueError("Document source cannot be empty")
 

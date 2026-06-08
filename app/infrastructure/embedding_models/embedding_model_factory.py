@@ -49,7 +49,7 @@ def create_embedding_model(settings: EmbeddingModelSettings) -> EmbeddingModelPo
         ValueError: Si ``settings.embedding_provider`` no está soportado o falta
             la API key requerida.
     """
-    provider = settings.embedding_provider.strip().casefold()
+    provider = _normalized_provider(settings.embedding_provider)
 
     if provider == "openai":
         return OpenAIEmbeddingModel(
@@ -90,3 +90,8 @@ def _required_key(value: str | None, env_name: str) -> str:
         raise ValueError(f"{env_name} must be configured")
 
     return value
+
+
+def _normalized_provider(provider: str) -> str:
+    """Normaliza provider, tolerando comillas externas de env vars."""
+    return provider.strip().strip("\"'").casefold()

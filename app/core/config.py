@@ -51,6 +51,14 @@ class Settings(BaseSettings):
         alias="ANSWER_VALIDATION_RETRIES",
     )
     llm_provider: str = Field(default="openai", alias="LLM_PROVIDER")
+    llm_temperature: float = Field(
+        default=0.0,
+        ge=0,
+        le=2,
+        alias="LLM_TEMPERATURE",
+    )
+    judge_llm_provider: str | None = Field(default=None, alias="JUDGE_LLM_PROVIDER")
+    judge_llm_model: str | None = Field(default=None, alias="JUDGE_LLM_MODEL")
     embedding_provider: str = Field(default="openai", alias="EMBEDDING_PROVIDER")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     openai_llm_model: str = Field(default="gpt-5.5", alias="OPENAI_LLM_MODEL")

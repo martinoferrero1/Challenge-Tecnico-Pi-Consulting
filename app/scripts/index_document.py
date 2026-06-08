@@ -12,7 +12,6 @@ async def run() -> None:
     Lee ``settings.source_document_path``, arma el caso de uso de indexación y
     muestra por consola el documento, chunks y embeddings generados.
     """
-    print("Indexing document...")
     use_case = create_index_document_use_case(settings)
     print(f"Using document path: {settings.source_document_path}")
     result = await use_case.execute(settings.source_document_path)

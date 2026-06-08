@@ -1,6 +1,10 @@
+import logging
 from typing import Any
 
 from app.domain.entities.language import DetectedLanguage
+
+
+logger = logging.getLogger(__name__)
 
 
 class LinguaLanguageDetector:
@@ -31,13 +35,17 @@ class LinguaLanguageDetector:
         confidence_values = self._get_detector().compute_language_confidence_values(
             text
         )
-        #print(f"detected languages and confidences: {confidence_values}")
+
         if not confidence_values:
             return None
 
         best_value = max(confidence_values, key=lambda value: value.value)
 
-        print(f"best detected language: {best_value.language} with confidence {best_value.value}")
+        logger.debug(
+            "Best detected language: %s with confidence %.4f",
+            best_value.language,
+            best_value.value,
+        )
 
         return DetectedLanguage(
             name=self._language_name(best_value.language),

@@ -123,11 +123,11 @@ class FakeAnswerCache:
     [
         (
             "Hola!",
-            "Hola, el asistente esta listo para responder preguntas sobre el documento \U0001F642.",
+            "Hola, Ana, el asistente esta listo para responder preguntas sobre el documento \U0001F642.",
         ),
         (
             "Chau",
-            "Hasta pronto, el asistente queda disponible para futuras consultas sobre el documento \U0001F44B.",
+            "Hasta pronto, Ana, el asistente queda disponible para futuras consultas sobre el documento \U0001F44B.",
         ),
     ],
 )
@@ -541,6 +541,79 @@ def test_context_aware_cache_judges_same_question_with_different_context() -> No
     assert len(llm.prompts) == 5
     assert 'Set decision to "same"' in llm.prompts[3]
     assert 'Set decision to "different"' in llm.prompts[3]
+
+
+def test_context_aware_cache_can_use_separate_judge_llm() -> None:
+    retrieved_chunk = RetrievedChunk(
+        chunk=DocumentChunk(
+            id="chunk-1",
+            content="El documento contiene fechas de apertura.",
+        ),
+        similarity_score=0.9,
+    )
+    embedding_model = FakeEmbeddingModel()
+    vector_store = FakeVectorStore([retrieved_chunk])
+    llm = FakeLLM(
+        responses=[
+            "Cuando fue fundada Zara?",
+            "Zara fue fundada en 1975.",
+            "Cuando abrio Mango?",
+            "Mango abrio en 1984.",
+        ]
+    )
+    judge_llm = FakeLLM(responses=["different"])
+    cache = FakeAnswerCache()
+    use_case = AnswerQuestionUseCase(
+        embedding_model=embedding_model,
+        vector_store=vector_store,
+        llm=llm,
+        answer_cache=cache,
+        language_detector=FakeLanguageDetector(
+            DetectedLanguage(name="Spanish", confidence=0.99)
+        ),
+        config=AnswerQuestionConfig(
+            conversation_context_mode="rewrite",
+            answer_cache_mode="context_aware",
+            answer_validation_retries=0,
+        ),
+        cache_judge_llm=judge_llm,
+    )
+
+    first_answer = asyncio.run(
+        use_case.execute(
+            UserQuestion(
+                user_name="Ana",
+                content="Y cuando?",
+                conversation_history=(
+                    ConversationMessage(
+                        role="user",
+                        content="Quien fundo Zara?",
+                    ),
+                ),
+            )
+        )
+    )
+    second_answer = asyncio.run(
+        use_case.execute(
+            UserQuestion(
+                user_name="Ana",
+                content="Y cuando?",
+                conversation_history=(
+                    ConversationMessage(
+                        role="user",
+                        content="Cuando se creo Mango?",
+                    ),
+                ),
+            )
+        )
+    )
+
+    assert first_answer.content == "Zara fue fundada en 1975."
+    assert second_answer.content == "Mango abrio en 1984."
+    assert len(llm.prompts) == 4
+    assert len(judge_llm.prompts) == 1
+    assert 'Set decision to "same"' in judge_llm.prompts[0]
+    assert 'Set decision to "different"' in judge_llm.prompts[0]
 
 
 def test_context_aware_cache_does_not_shortcut_by_question_without_resolved_query() -> None:

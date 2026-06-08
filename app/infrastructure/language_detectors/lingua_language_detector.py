@@ -4,10 +4,27 @@ from app.domain.entities.language import DetectedLanguage
 
 
 class LinguaLanguageDetector:
+    """Detector de idioma basado en Lingua."""
+
     def __init__(self, detector: Any | None = None) -> None:
+        """Permite inyectar un detector para tests.
+
+        Args:
+            detector: Instancia compatible con Lingua. Si es ``None``, se crea
+                perezosamente.
+        """
         self.detector = detector
 
     def detect(self, text: str) -> DetectedLanguage | None:
+        """Detecta idioma y confidence para texto no vacío.
+
+        Args:
+            text: Texto sobre el que se calcula confianza de idioma.
+
+        Returns:
+            Idioma con mayor confianza o ``None`` si ``text`` está vacío o el
+            detector no devuelve valores.
+        """
         if not text.strip():
             return None
 
@@ -28,6 +45,11 @@ class LinguaLanguageDetector:
         )
 
     def _get_detector(self) -> Any:
+        """Construye perezosamente el detector Lingua.
+
+        Returns:
+            Instancia cacheada del detector Lingua.
+        """
         if self.detector is None:
             from lingua import LanguageDetectorBuilder
 
@@ -36,5 +58,13 @@ class LinguaLanguageDetector:
         return self.detector
 
     def _language_name(self, language: Any) -> str:
+        """Normaliza el nombre devuelto por Lingua.
+
+        Args:
+            language: Objeto o valor de idioma devuelto por Lingua.
+
+        Returns:
+            Nombre legible, con guiones bajos reemplazados por espacios.
+        """
         raw_name = getattr(language, "name", str(language))
         return raw_name.replace("_", " ").title()

@@ -7,6 +7,11 @@ from app.infrastructure.pipelines.indexing_pipeline import (
 
 
 async def run() -> None:
+    """Ejecuta la indexación del documento configurado.
+
+    Lee ``settings.source_document_path``, arma el caso de uso de indexación y
+    muestra por consola el documento, chunks y embeddings generados.
+    """
     print("Indexing document...")
     use_case = create_index_document_use_case(settings)
     print(f"Using document path: {settings.source_document_path}")
@@ -23,6 +28,7 @@ async def run() -> None:
 
 
 def main() -> None:
+    """Entrada CLI sincrónica para correr la indexación."""
     asyncio.run(run())
 
 

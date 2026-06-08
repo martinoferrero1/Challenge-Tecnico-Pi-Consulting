@@ -13,6 +13,19 @@ from app.infrastructure.embedding_models.openai_embedding_model import (
 
 
 class EmbeddingModelSettings(Protocol):
+    """Subset de settings requerido para crear embeddings.
+
+    Atributos:
+        embedding_provider: Provider seleccionado para embeddings.
+        openai_api_key: API key usada por OpenAI.
+        openai_embedding_model: Modelo de embeddings de OpenAI.
+        cohere_api_key: API key usada por Cohere.
+        cohere_embedding_model: Modelo de embeddings de Cohere.
+        cohere_embedding_input_type: Tipo de input enviado a Cohere.
+        gemini_api_key: API key usada por Gemini.
+        gemini_embedding_model: Modelo de embeddings de Gemini.
+    """
+
     embedding_provider: str
     openai_api_key: str | None
     openai_embedding_model: str
@@ -24,6 +37,18 @@ class EmbeddingModelSettings(Protocol):
 
 
 def create_embedding_model(settings: EmbeddingModelSettings) -> EmbeddingModelPort:
+    """Crea el adaptador de embeddings según el provider configurado.
+
+    Args:
+        settings: Configuración con provider, modelos y API keys.
+
+    Returns:
+        Adapter que implementa ``EmbeddingModelPort``.
+
+    Raises:
+        ValueError: Si ``settings.embedding_provider`` no está soportado o falta
+            la API key requerida.
+    """
     provider = settings.embedding_provider.strip().casefold()
 
     if provider == "openai":
@@ -49,6 +74,18 @@ def create_embedding_model(settings: EmbeddingModelSettings) -> EmbeddingModelPo
 
 
 def _required_key(value: str | None, env_name: str) -> str:
+    """Valida que una API key requerida esté configurada.
+
+    Args:
+        value: Valor leído desde settings.
+        env_name: Nombre de la variable de entorno usada para el error.
+
+    Returns:
+        API key no vacía.
+
+    Raises:
+        ValueError: Si ``value`` es ``None`` o queda vacío.
+    """
     if not value or not value.strip():
         raise ValueError(f"{env_name} must be configured")
 

@@ -6,10 +6,30 @@ from app.domain.entities.document import Document
 
 
 class DocxDocumentLoader:
+    """Carga documentos DOCX y los convierte en entidades del dominio."""
+
     def __init__(self, loader_cls: type[Any] | None = None) -> None:
+        """Permite inyectar un loader alternativo para tests.
+
+        Args:
+            loader_cls: Clase compatible con el loader de LangChain. Si es
+                ``None``, se usa ``Docx2txtLoader``.
+        """
         self.loader_cls = loader_cls
 
     async def load(self, source: str) -> Document:
+        """Carga un archivo DOCX desde disco.
+
+        Args:
+            source: Ruta local del archivo ``.docx``.
+
+        Returns:
+            Documento de dominio con contenido extraído y metadata básica.
+
+        Raises:
+            FileNotFoundError: Si ``source`` no existe.
+            ValueError: Si ``source`` no tiene extensión ``.docx``.
+        """
         path = Path(source)
 
         if not path.exists():
@@ -34,6 +54,14 @@ class DocxDocumentLoader:
         )
 
     def _load_documents(self, path: Path) -> list[Any]:
+        """Ejecuta el loader concreto de LangChain.
+
+        Args:
+            path: Ruta local validada del documento DOCX.
+
+        Returns:
+            Lista de documentos devuelta por el loader concreto.
+        """
         if self.loader_cls:
             loader_cls = self.loader_cls
         else:

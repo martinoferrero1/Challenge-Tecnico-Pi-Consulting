@@ -24,6 +24,31 @@ from app.infrastructure.vector_store.chroma_vector_store import ChromaVectorStor
 
 
 class AnswerQuestionSettings(Protocol):
+    """Subset de settings requerido para responder preguntas.
+
+    Atributos:
+        rag_retrieval_limit: Cantidad máxima de chunks a recuperar.
+        conversation_context_mode: Modo de uso del historial conversacional.
+        answer_cache_mode: Modo de cache de respuestas.
+        conversation_history_limit: Cantidad máxima de mensajes del historial.
+        language_confidence_threshold: Umbral de confianza para idioma.
+        answer_validation_retries: Cantidad de reintentos de formato.
+        llm_provider: Provider LLM seleccionado.
+        embedding_provider: Provider de embeddings seleccionado.
+        openai_api_key: API key de OpenAI.
+        openai_llm_model: Modelo LLM de OpenAI.
+        openai_embedding_model: Modelo de embeddings de OpenAI.
+        cohere_api_key: API key de Cohere.
+        cohere_llm_model: Modelo LLM de Cohere.
+        cohere_embedding_model: Modelo de embeddings de Cohere.
+        cohere_embedding_input_type: Tipo de input de embeddings de Cohere.
+        gemini_api_key: API key de Gemini.
+        gemini_llm_model: Modelo LLM de Gemini.
+        gemini_embedding_model: Modelo de embeddings de Gemini.
+        chroma_persist_dir: Carpeta de persistencia de Chroma.
+        chroma_collection_name: Colección Chroma usada para retrieval.
+    """
+
     rag_retrieval_limit: int
     conversation_context_mode: str
     answer_cache_mode: str
@@ -49,6 +74,15 @@ class AnswerQuestionSettings(Protocol):
 def create_answer_question_use_case(
     settings: AnswerQuestionSettings,
 ) -> AnswerQuestionUseCase:
+    """Arma el caso de uso de preguntas con infraestructura concreta.
+
+    Args:
+        settings: Configuración requerida para LLM, embeddings, Chroma, cache y
+            conversación.
+
+    Returns:
+        Caso de uso listo para responder preguntas.
+    """
     return AnswerQuestionUseCase(
         embedding_model=create_embedding_model(settings),
         vector_store=ChromaVectorStore(
@@ -72,9 +106,19 @@ def create_answer_question_use_case(
 
 @lru_cache(maxsize=1)
 def get_answer_cache() -> AnswerCachePort:
+    """Devuelve el cache singleton en memoria.
+
+    Returns:
+        Instancia única de ``InMemoryAnswerCache`` para el proceso actual.
+    """
     return InMemoryAnswerCache()
 
 
 @lru_cache(maxsize=1)
 def get_conversation_store() -> ConversationStorePort:
+    """Devuelve el store singleton de conversación en memoria.
+
+    Returns:
+        Instancia única de ``InMemoryConversationStore`` para el proceso actual.
+    """
     return InMemoryConversationStore()

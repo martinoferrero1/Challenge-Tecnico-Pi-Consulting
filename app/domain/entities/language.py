@@ -3,10 +3,23 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class DetectedLanguage:
+    """Idioma detectado junto con su confianza.
+
+    Atributos:
+        name: Nombre del idioma detectado.
+        confidence: Confianza normalizada entre 0 y 1.
+    """
+
     name: str
     confidence: float
 
     def __post_init__(self) -> None:
+        """Valida ``name`` y ``confidence``.
+
+        Raises:
+            ValueError: Si ``name`` queda vacío o si ``confidence`` queda fuera
+                del rango 0 a 1.
+        """
         name = self.name.strip()
 
         if not name:

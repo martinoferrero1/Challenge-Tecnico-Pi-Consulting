@@ -8,5 +8,11 @@ from app.infrastructure.pipelines.question_answering_pipeline import (
 
 
 @lru_cache(maxsize=1)
-def get_answer_question_use_case() -> AnswerQuestionUseCase: # lo implemento así para desacoplar la creación del caso de uso de la lógica de negocio (y desde la api no interactuo con infraestructura), y para aprovechar el caching que ofrece lru_cache y no crear múltiples instancias del caso de uso
+def get_answer_question_use_case() -> AnswerQuestionUseCase:
+    """Construye y cachea el caso de uso de preguntas para FastAPI.
+
+    Returns:
+        Instancia singleton de ``AnswerQuestionUseCase`` configurada con
+        infraestructura real.
+    """
     return create_answer_question_use_case(settings)

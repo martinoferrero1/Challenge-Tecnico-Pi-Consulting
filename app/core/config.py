@@ -4,6 +4,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Configuración central cargada desde variables de entorno."""
+
     app_name: str = Field(default="Challenge AI RAG API", alias="APP_NAME")
     app_version: str = Field(default="0.1.0", alias="APP_VERSION")
     api_prefix: str = Field(default="/api", alias="API_PREFIX")
@@ -22,7 +24,7 @@ class Settings(BaseSettings):
     )
     text_chunk_size: int = Field(default=800, alias="TEXT_CHUNK_SIZE")
     text_chunk_overlap: int = Field(default=120, alias="TEXT_CHUNK_OVERLAP")
-    rag_retrieval_limit: int = Field(default=4, alias="RAG_RETRIEVAL_LIMIT")
+    rag_retrieval_limit: int = Field(default=3, alias="RAG_RETRIEVAL_LIMIT")
     conversation_context_mode: str = Field(
         default="disabled",
         alias="CONVERSATION_CONTEXT_MODE",

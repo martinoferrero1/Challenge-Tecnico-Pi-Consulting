@@ -12,6 +12,19 @@ async def invoke_structured(
     prompt: str,
     output_schema: type[StructuredOutput],
 ) -> StructuredOutput:
+    """Invoca un cliente con salida estructurada y valida el resultado.
+
+    Args:
+        client: Cliente LLM compatible con ``with_structured_output``.
+        prompt: Prompt enviado al cliente estructurado.
+        output_schema: Schema Pydantic esperado para validar la respuesta.
+
+    Returns:
+        Instancia validada de ``output_schema``.
+
+    Raises:
+        NotImplementedError: Si ``client`` no soporta structured output.
+    """
     if not hasattr(client, "with_structured_output"):
         raise NotImplementedError("This LLM client does not support structured output")
 

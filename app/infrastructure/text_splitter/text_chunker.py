@@ -20,11 +20,25 @@ _SECTION_TITLE_PATTERN = re.compile(r"^(?P<title>[^:\n]{1,120}):\s+")
 
 @dataclass(frozen=True)
 class TextSplitterConfig:
+    """Configuración de estrategia y tamaño de chunking.
+
+    Atributos:
+        chunk_size: Tamaño máximo del chunk en la estrategia recursiva.
+        chunk_overlap: Overlap entre chunks en la estrategia recursiva.
+        strategy: Estrategia de chunking seleccionada.
+    """
+
     chunk_size: int = 800
     chunk_overlap: int = 120
     strategy: str = RECURSIVE_CHUNKING_STRATEGY
 
     def __post_init__(self) -> None:
+        """Valida ``strategy``, ``chunk_size`` y ``chunk_overlap``.
+
+        Raises:
+            ValueError: Si ``strategy`` no está soportada, si ``chunk_size`` no
+                es positivo, o si ``chunk_overlap`` es inválido.
+        """
         if self.strategy not in _SUPPORTED_CHUNKING_STRATEGIES:
             raise ValueError(f"Unsupported chunking strategy: {self.strategy}")
         if self.chunk_size <= 0:
@@ -36,21 +50,46 @@ class TextSplitterConfig:
 
 
 class TextChunker:
+    """Chunker de documentos con estrategia genérica o por secciones."""
+
     def __init__(
         self,
         config: TextSplitterConfig | None = None,
         splitter: Any | None = None,
     ) -> None:
+        """Inicializa el splitter con configuración o dependencia inyectada.
+
+        Args:
+            config: Configuración de chunking. Si es ``None``, usa valores por
+                defecto.
+            splitter: Splitter compatible con LangChain, opcional para tests.
+        """
         self.config = config or TextSplitterConfig()
         self.splitter = splitter or self._build_splitter()
 
     def chunk(self, document: Document) -> tuple[DocumentChunk, ...]:
+        """Divide un documento según la estrategia configurada.
+
+        Args:
+            document: Documento de dominio a dividir.
+
+        Returns:
+            Tupla de chunks generados desde ``document``.
+        """
         if self.config.strategy == DEFAULT_DOCUMENT_SECTIONS_CHUNKING_STRATEGY:
             return self._chunk_default_document_sections(document)
 
         return self._chunk_with_splitter(document)
 
     def _chunk_with_splitter(self, document: Document) -> tuple[DocumentChunk, ...]:
+        """Aplica RecursiveCharacterTextSplitter y mapea chunks de dominio.
+
+        Args:
+            document: Documento que se divide con el splitter genérico.
+
+        Returns:
+            Chunks de dominio con metadata normalizada.
+        """
         source_document = self._to_source_document(document)
         split_documents = self.splitter.split_documents([source_document])
         chunks: list[DocumentChunk] = []
@@ -83,6 +122,15 @@ class TextChunker:
         self,
         document: Document,
     ) -> tuple[DocumentChunk, ...]:
+        """Divide el documento default en secciones tituladas sin overlap.
+
+        Args:
+            document: Documento default del challenge.
+
+        Returns:
+            Un chunk por sección detectada, o fallback al splitter genérico si
+            no se detectan secciones.
+        """
         sections = self._split_default_document_sections(document.content)
         if not sections:
             return self._chunk_with_splitter(document)
@@ -115,6 +163,14 @@ class TextChunker:
         self,
         content: str,
     ) -> tuple[dict[str, str], ...]:
+        """Extrae secciones por párrafos y títulos terminados en dos puntos.
+
+        Args:
+            content: Texto completo del documento default.
+
+        Returns:
+            Tupla de diccionarios con ``content`` y ``title`` por sección.
+        """
         paragraphs = [
             paragraph.strip()
             for paragraph in re.split(r"\n\s*\n+", content.strip())
@@ -136,6 +192,11 @@ class TextChunker:
         return tuple(sections)
 
     def _build_splitter(self) -> Any:
+        """Construye el splitter recursivo usado en documentos genéricos.
+
+        Returns:
+            Instancia de ``RecursiveCharacterTextSplitter`` configurada.
+        """
         from langchain_text_splitters import RecursiveCharacterTextSplitter
 
         return RecursiveCharacterTextSplitter(
@@ -145,6 +206,14 @@ class TextChunker:
         )
 
     def _to_source_document(self, document: Document) -> Any:
+        """Convierte la entidad Document al formato esperado por LangChain.
+
+        Args:
+            document: Documento de dominio.
+
+        Returns:
+            Documento compatible con LangChain.
+        """
         from langchain_core.documents import Document as SourceDocument
 
         return SourceDocument(
@@ -161,10 +230,28 @@ class TextChunker:
         chunk_index: int,
         content: str,
     ) -> str:
+        """Genera un identificador determinístico para un chunk.
+
+        Args:
+            document_id: Identificador del documento fuente.
+            chunk_index: Posición del chunk dentro del documento.
+            content: Contenido del chunk usado para el hash.
+
+        Returns:
+            Identificador estable del chunk.
+        """
         content_hash = sha256(content.encode("utf-8")).hexdigest()[:12]
         return f"{document_id}:chunk:{chunk_index}:{content_hash}"
 
     def _string_metadata(self, metadata: dict[str, Any]) -> dict[str, str]:
+        """Convierte metadata a strings para persistencia vectorial.
+
+        Args:
+            metadata: Metadata heterogénea generada durante el chunking.
+
+        Returns:
+            Metadata con claves y valores convertidos a ``str``.
+        """
         return {
             str(key): str(value)
             for key, value in metadata.items()

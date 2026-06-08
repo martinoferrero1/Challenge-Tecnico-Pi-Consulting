@@ -95,14 +95,20 @@ class FakeLLM:
 class FakeAnswerCache:
     def __init__(self) -> None:
         self.answers: dict[AnswerCacheKey, Answer] = {}
+        self.get_calls: list[AnswerCacheKey] = []
+        self.set_calls: list[AnswerCacheKey] = []
+        self.list_by_question_calls: list[str] = []
 
     async def get(self, key: AnswerCacheKey) -> Answer | None:
+        self.get_calls.append(key)
         return self.answers.get(key)
 
     async def set(self, key: AnswerCacheKey, answer: Answer) -> None:
+        self.set_calls.append(key)
         self.answers[key] = answer
 
     async def list_by_question(self, question: str) -> list[Answer]:
+        self.list_by_question_calls.append(question)
         normalized_question = " ".join(question.strip().split()).casefold()
 
         return [
@@ -110,6 +116,84 @@ class FakeAnswerCache:
             for key, answer in self.answers.items()
             if key.question == normalized_question
         ]
+
+
+@pytest.mark.parametrize(
+    ("question_content", "expected_answer"),
+    [
+        (
+            "Hola!",
+            "Hola, el asistente esta listo para responder preguntas sobre el documento \U0001F642.",
+        ),
+        (
+            "Chau",
+            "Hasta pronto, el asistente queda disponible para futuras consultas sobre el documento \U0001F44B.",
+        ),
+    ],
+)
+def test_answer_question_handles_only_pure_greetings_and_farewells(
+    question_content: str,
+    expected_answer: str,
+) -> None:
+    embedding_model = FakeEmbeddingModel()
+    vector_store = FakeVectorStore([])
+    llm = FakeLLM()
+    cache = FakeAnswerCache()
+    use_case = AnswerQuestionUseCase(
+        embedding_model=embedding_model,
+        vector_store=vector_store,
+        llm=llm,
+        answer_cache=cache,
+        language_detector=FakeLanguageDetector(),
+    )
+
+    answer = asyncio.run(
+        use_case.execute(UserQuestion(user_name="Ana", content=question_content))
+    )
+
+    assert answer.content == expected_answer
+    assert answer.context == ()
+    assert answer.diagnostics is not None
+    assert answer.diagnostics.cache_hit is False
+    assert embedding_model.texts == []
+    assert vector_store.limits == []
+    assert llm.prompts == []
+    assert cache.get_calls == []
+    assert cache.set_calls == []
+    assert cache.list_by_question_calls == []
+
+
+def test_answer_question_uses_rag_when_greeting_has_more_content() -> None:
+    retrieved_chunk = RetrievedChunk(
+        chunk=DocumentChunk(
+            id="chunk-1",
+            content="Zara es una empresa internacional de moda.",
+        ),
+        similarity_score=0.9,
+    )
+    embedding_model = FakeEmbeddingModel()
+    vector_store = FakeVectorStore([retrieved_chunk])
+    llm = FakeLLM(response="Zara es una empresa de moda \U0001F642.")
+    use_case = AnswerQuestionUseCase(
+        embedding_model=embedding_model,
+        vector_store=vector_store,
+        llm=llm,
+        answer_cache=FakeAnswerCache(),
+        language_detector=FakeLanguageDetector(
+            DetectedLanguage(name="Spanish", confidence=0.99)
+        ),
+        config=AnswerQuestionConfig(answer_validation_retries=0),
+    )
+
+    answer = asyncio.run(
+        use_case.execute(UserQuestion(user_name="Ana", content="Hola, que es Zara?"))
+    )
+
+    assert answer.content == "Zara es una empresa de moda \U0001F642."
+    assert embedding_model.texts == ["Hola, que es Zara?"]
+    assert vector_store.limits == [4]
+    assert len(llm.prompts) == 1
+    assert "Zara es una empresa internacional de moda." in llm.prompts[0]
 
 
 class FakeLanguageDetector:
@@ -160,6 +244,12 @@ def test_answer_question_generates_and_caches_answer() -> None:
     assert first_answer.content == "Zara es una empresa de moda 👗."
     assert cached_answer.content == "Zara es una empresa de moda 👗."
     assert cached_answer.question.user_name == "Luis"
+    assert first_answer.diagnostics is not None
+    assert first_answer.diagnostics.cache_hit is False
+    assert "retrieval" in first_answer.diagnostics.stage_latencies_ms
+    assert cached_answer.diagnostics is not None
+    assert cached_answer.diagnostics.cache_hit is True
+    assert cached_answer.diagnostics.cache_hit_source == "document_context"
     assert len(llm.prompts) == 1
     assert "Zara es una empresa internacional de moda." in llm.prompts[0]
     assert "You must answer in Spanish." in llm.prompts[0]

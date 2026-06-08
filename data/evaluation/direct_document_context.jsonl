@@ -1,6 +1,6 @@
-{"id":"direct-001","conversation":"direct","question":"Quien descubre el antiguo artefacto en Zenthoria?","notes":"Pregunta directa sobre Ficcion Espacial; util para disabled + document_context."}
-{"id":"direct-002","conversation":"direct","question":"Que civilizaciones estan al borde de la guerra intergalactica?","notes":"Pregunta directa con dos entidades."}
-{"id":"direct-003","conversation":"direct","question":"Que descubre Alex sobre las supercomputadoras?","notes":"Pregunta directa sobre Ficcion Tecnologica."}
-{"id":"direct-004","conversation":"direct","question":"Como se llama la flor magica de la selva amazonica?","notes":"Pregunta directa sobre Naturaleza Deslumbrante."}
-{"id":"direct-005","conversation":"direct","question":"Que creen los lugarenos sobre la Luz de Luna?","notes":"Pregunta directa sobre creencia local."}
-{"id":"direct-006","conversation":"direct","question":"Que habilidades caracterizan a Sombra Silenciosa?","notes":"Pregunta directa sobre el Heroe Olvidado."}
+{"id":"direct-001","conversation":"direct","question":"Quien descubre el antiguo artefacto en Zenthoria?","expected_sections":["Ficción Espacial"],"notes":"Pregunta directa sobre Ficcion Espacial; util para disabled + document_context."}
+{"id":"direct-002","conversation":"direct","question":"Que civilizaciones estan al borde de la guerra intergalactica?","expected_sections":["Ficción Espacial"],"notes":"Pregunta directa con dos entidades."}
+{"id":"direct-003","conversation":"direct","question":"Que descubre Alex sobre las supercomputadoras?","expected_sections":["Ficción Tecnológica"],"notes":"Pregunta directa sobre Ficcion Tecnologica."}
+{"id":"direct-004","conversation":"direct","question":"Como se llama la flor magica de la selva amazonica?","expected_sections":["Naturaleza Deslumbrante"],"notes":"Pregunta directa sobre Naturaleza Deslumbrante."}
+{"id":"direct-005","conversation":"direct","question":"Que creen los lugarenos sobre la Luz de Luna?","expected_sections":["Naturaleza Deslumbrante"],"notes":"Pregunta directa sobre creencia local."}
+{"id":"direct-006","conversation":"direct","question":"Que habilidades caracterizan a Sombra Silenciosa?","expected_sections":["Características del Héroe Olvidado"],"notes":"Pregunta directa sobre el Heroe Olvidado."}

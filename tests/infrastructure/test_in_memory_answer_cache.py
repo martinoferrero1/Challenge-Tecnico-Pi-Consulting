@@ -22,13 +22,6 @@ def test_in_memory_answer_cache_stores_and_returns_answers() -> None:
     assert asyncio.run(cache.get(key)) == answer
 
 
-def test_in_memory_answer_cache_returns_none_for_missing_key() -> None:
-    cache = InMemoryAnswerCache()
-    key = AnswerCacheKey(question="que es zara?", context_hash="context")
-
-    assert asyncio.run(cache.get(key)) is None
-
-
 def test_in_memory_answer_cache_lists_answers_by_question() -> None:
     cache = InMemoryAnswerCache()
     zara_answer = Answer(

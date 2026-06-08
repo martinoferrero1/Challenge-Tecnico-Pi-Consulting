@@ -1,8 +1,10 @@
 # API run datasets
 
 These JSONL datasets run ordered question sequences against the API using
-content from `data/original_document.docx`. They do not grade answer quality; they
-only print and save API responses so you can inspect them manually.
+content from `data/original_document.docx`.
+
+The script prints and saves every response, and also calculates lightweight RAG
+metrics for each run.
 
 ## Recommended mode/dataset pairs
 
@@ -80,5 +82,60 @@ The script prints results in request order and writes JSONL output to:
 data/evaluation/results/
 ```
 
+It also writes metrics summaries and Prometheus text files to:
+
+```text
+data/evaluation/metrics/
+```
+
+To group metrics from a run in a named folder:
+
+```powershell
+.\.venv\Scripts\python app\scripts\run_api_evaluation.py --dataset data\evaluation\question_cache_exact.jsonl --metrics-run-name cache-question-mode
+```
+
+That writes metrics to:
+
+```text
+data/evaluation/metrics/cache-question-mode/
+```
+
 Each run uses unique `user_name` values so in-memory conversations from one
 run do not mix with another run.
+
+## Metrics
+
+The datasets include `expected_sections`, which makes these retrieval metrics
+available:
+
+- `Recall@K`
+- `MRR`
+- `Context relevance`
+
+The script also computes automatic lexical approximations for:
+
+- `Groundedness`
+- `Answer relevance`
+
+Operational metrics are measured directly:
+
+- `Latency total`
+- `Latency by stage`, when the API returns diagnostics
+- `Estimated tokens per request`
+- `Error rate`
+- `Prompt injection attempts detected`
+- `Cache hit rate`
+
+`Citation accuracy` is emitted only when answers include bracket citations that
+can be compared with `expected_sections`. The current answer prompt does not ask
+for citations, so this metric will usually be `null`.
+
+Use `--k` to change the K used by `Recall@K` and `MRR`:
+
+```powershell
+.\.venv\Scripts\python app\scripts\run_api_evaluation.py --dataset data\evaluation\direct_document_context.jsonl --k 4
+```
+
+The `.prom` files use Prometheus exposition format. To view them in Grafana, the
+simplest path is to have Prometheus scrape or load those metrics, then add
+Prometheus as a Grafana data source.

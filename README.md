@@ -118,7 +118,11 @@ El flujo principal de `POST /api/questions` es:
 11. Se validan reglas simples de formato y se reintenta una vez si está configurado.
 12. Se cachea la respuesta y se guarda el turno en la conversación en memoria.
 
-El endpoint público no devuelve diagnósticos internos. Para evaluación existe `POST /api/questions/evaluation`, que responde lo mismo más `diagnostics`.
+Nota: Para simplificar el flujo ante saludos y despedidas (dado que no es el foco del challenge) se detecta por palabras o frases simples y conocidas de los idiomas soportados, asumiendo que el usuario utiliza el sistema de manera informativa y no con mensajes con intención única de saludo o despedida (poco probable).
+
+Si se quisiera se podría detectar de forma un poco más inteligente con NLTK o Spacy este tipo de intención (para soportar bienvenidas o despedidas poco usuales o mal escritas). También podría usar una capa extra de LLM en el medio (bastante más costoso), o la misma capa indicando con salida estructurada esa intención (agregaría costo por los tokens de entrada extra del prompt, y la salida estructurada con el razonamiento), o el prompt más detallado (ahorraría otra llamada pero implicaría un prompt un poco más sensible a confusiones de intención, ya que de por sí entre el contenido de los chunks y el prompt base ya es suficiente ventana para los modelos que tendría sentido usar en un proyecto como este), pero sería más costoso (sobre todo a escala) y no se justificaría para el caso de uso en cuestión. &rarr; ***Esta última alternativa es un pequeño cambio de implementación en la rama `simple_alternative-to-controlling-greetings-and-farewells`, si se quiere ver la diferencia de resultados, correr esta última en vez de main***
+
+Por otro lado, el endpoint público no devuelve diagnósticos internos. Para evaluación existe `POST /api/questions/evaluation`, que responde lo mismo más `diagnostics`.
 
 ## Endpoints
 

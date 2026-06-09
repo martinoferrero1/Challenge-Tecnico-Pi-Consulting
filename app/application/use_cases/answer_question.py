@@ -797,6 +797,8 @@ class AnswerQuestionUseCase:
 
         return (
             "Answer the user question using only the provided context.\n"
+            "If you detect that the intent is purely and exclusively a greeting or farewell, "
+            "answer with a simple message (but following the rules) and do not use the context.\n"
             "If the context is not enough, say that there is not enough information.\n"
             "Answer in exactly one sentence.\n"
             "Do not use bullet points, lists, or multiple sentences.\n"
@@ -834,6 +836,8 @@ class AnswerQuestionUseCase:
         """
         return (
             "Return only a fallback answer.\n"
+            "If you detect that the intent is purely and exclusively a greeting or farewell, "
+            "answer with a simple message (but following the rules) and do not use the context.\n"
             "The fallback answer must say that there is not enough information "
             "in the document to answer the question.\n"
             "The fallback answer must be exactly one sentence.\n"
